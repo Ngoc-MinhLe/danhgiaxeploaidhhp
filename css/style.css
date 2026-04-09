@@ -1,0 +1,70 @@
+:root {
+    --primary-color: #0056b3;
+    --danger-color: #dc3545;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --bg-color: #f4f7f6;
+    --border-color: #ddd;
+}
+
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); margin: 0; padding: 0; }
+.top-bar { background-color: #333; color: white; padding: 10px 20px; display: flex; justify-content: flex-end; align-items: center; gap: 15px; }
+.container { max-width: 1100px; margin: 20px auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+header { text-align: center; border-bottom: 2px solid var(--primary-color); padding-bottom: 15px; margin-bottom: 20px; }
+header h1, header h2 { color: var(--primary-color); margin: 5px 0; }
+
+/* Tabs */
+.workflow-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #ccc; padding-bottom: 10px; }
+.tab-btn { background: #e9ecef; color: #333; flex: 1; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 5px 5px 0 0; }
+.tab-btn.active { background: var(--primary-color); color: white; box-shadow: inset 0 -3px 0 0 #003d82; }
+.tab-content { display: none; animation: fadeIn 0.3s; }
+.tab-content.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.step-card { background: #f8f9fa; border: 1px solid #e9ecef; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+.step-card h3 { margin-top: 0; color: #0056b3; border-bottom: 1px dashed #ccc; padding-bottom: 10px; }
+.inline-form { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+
+.control-panel { display: flex; justify-content: space-between; background: #e9ecef; padding: 15px; border-radius: 5px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;}
+.meta-controls, .type-controls { display: flex; gap: 15px; align-items: center; }
+select, input[type="number"], input[type="text"], input[type="email"] { padding: 8px; font-size: 15px; border-radius: 4px; border: 1px solid #ccc; }
+
+.admin-panel, .super-admin-panel { background: #ffeeba; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ffe8a1; }
+.super-admin-panel { background: #d1ecf1; border-color: #bee5eb; }
+.super-admin-panel h3 { color: #0c5460; margin-top: 0; }
+.admin-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;}
+.add-form { display: flex; gap: 10px; flex-wrap: wrap; }
+
+#adminList { margin-top: 15px; background: white; border: 1px solid #ddd; padding: 10px; border-radius: 4px; }
+.admin-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee; }
+
+table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px; }
+th, td { border: 1px solid var(--border-color); padding: 10px 5px; text-align: center; }
+th { background-color: var(--primary-color); color: white; position: sticky; top: 0; }
+.dept-row { background-color: #d1e7dd; font-weight: bold; text-align: left; }
+.text-left { text-align: left; }
+
+button { border: none; padding: 10px 20px; font-size: 15px; border-radius: 4px; cursor: pointer; color: white; background-color: var(--primary-color); transition: 0.3s;}
+button:hover { opacity: 0.9; }
+button:disabled { background-color: #ccc; cursor: not-allowed; }
+.btn-secondary { background-color: #6c757d; }
+.btn-danger { background-color: var(--danger-color); padding: 4px 8px; font-size: 12px; margin-left: 10px; }
+.btn-success { background-color: var(--success-color); }
+.btn-warning { background-color: #d39e00; color: #fff;}
+
+.hidden { display: none !important; }
+#message { margin-top: 15px; padding: 15px; border-radius: 5px; text-align: center; font-weight: bold; }
+.success { background-color: #d4edda; color: #155724; }
+.error { background-color: #f8d7da; color: #721c24; }
+#loadingMsg { text-align: center; font-style: italic; color: #666; margin: 20px; }
+/* --- Giao diện Tab cho Khu vực Quản trị --- */
+.admin-tabs { display: flex; gap: 5px; border-bottom: 2px solid var(--primary-color); margin-bottom: 20px; flex-wrap: wrap; }
+.admin-tab-btn { background: #e9ecef; border: none; padding: 12px 20px; cursor: pointer; font-weight: bold; border-radius: 5px 5px 0 0; font-size: 15px; color: #555; transition: 0.2s;}
+.admin-tab-btn:hover { background: #d0d4d8; }
+.admin-tab-btn.active { background: var(--primary-color); color: white; }
+.admin-tab-content { display: none; animation: fadeIn 0.3s; background: #fff; padding: 20px; border: 1px solid var(--border-color); border-top: none; border-radius: 0 0 5px 5px; }
+.admin-tab-content.active { display: block; }
+.admin-section-title { color: var(--primary-color); border-bottom: 1px dashed #ccc; padding-bottom: 10px; margin-top: 0; }
+.action-btn { padding: 3px 8px; font-size: 12px; border-radius: 3px; cursor: pointer; color: white; border: none; margin: 0 2px; }
+.btn-edit { background-color: #17a2b8; }
+.btn-edit:hover { background-color: #138496; }
