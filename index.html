@@ -27,6 +27,7 @@
             <button class="tab-btn active" data-target="step1">BƯỚC 1: CÁ NHÂN TỰ CHẤM</button>
             <button class="tab-btn" data-target="step2">BƯỚC 2: ĐƠN VỊ ĐỀ XUẤT</button>
             <button class="tab-btn" data-target="step3">BƯỚC 3: ĐẢNG ỦY BỎ PHIẾU</button>
+            <button class="tab-btn" data-target="step4">BƯỚC 4: BẦU XUẤT SẮC</button>
         </div>
 
         <div id="loadingMsg">Đang tải dữ liệu từ máy chủ...</div>
@@ -221,6 +222,27 @@
                     </div>
                 </div>
                 <div id="resultsDisplayArea" style="background: white; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">Vui lòng chọn Quý/Năm và bấm Tải Kết quả.</div>
+            </div>
+        </div>
+
+        <div id="step4" class="tab-content">
+            <div class="step-card">
+                <h3 style="color: #28a745; border-bottom: 1px dashed #28a745;">Bỏ phiếu Hoàn thành Xuất sắc nhiệm vụ</h3>
+                <p style="color: #666; font-style: italic; margin-bottom: 15px;">Danh sách chỉ gồm các cá nhân đạt "Hoàn thành Tốt nhiệm vụ" ở Bước 3. Số lượng Xuất sắc không vượt quá 20%.</p>
+                <div class="control-panel">
+                    <div class="meta-controls">
+                        <label><strong>Kỳ:</strong> <select id="step4Quarter"><option value="I">Quý I</option><option value="II">Quý II</option><option value="III">Quý III</option><option value="IV">Quý IV</option><option value="Cả năm">Cả năm</option></select></label>
+                        <label><strong>Năm:</strong> <input type="number" id="step4Year" value="2026" min="2020" max="2100" style="width: 80px;"></label>
+                        <button type="button" id="loadStep4Btn" class="btn-primary" style="margin-left: 10px;">Tải Danh sách Ứng viên</button>
+                    </div>
+                </div>
+                <form id="step4VotingForm" class="hidden">
+                    <div id="step4StatusMsg" style="margin-bottom: 10px;"></div>
+                    <div id="step4TableContainer"></div>
+                    <div class="submit-area" style="text-align: right; margin-top: 15px;">
+                        <button type="submit" id="submitStep4Btn" class="btn-success">Gửi phiếu bầu Xuất sắc</button>
+                    </div>
+                </form>
             </div>
         </div>
 
