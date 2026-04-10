@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getFirestore, collection, addDoc, doc, setDoc, deleteDoc, updateDoc, getDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, doc, setDoc, deleteDoc, updateDoc, getDoc, onSnapshot, serverTimestamp, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -18,31 +18,31 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 const SUPER_ADMIN_EMAIL = "minhln@dhhp.edu.vn";
 
-// NẠP SẴN CẤU TRÚC PHÂN NHÓM MẪU (Lưu ý: Mảng groups và mảng items riêng biệt)
+// --- DỮ LIỆU MẪU 3 CẤP ---
 const DEFAULT_GROUPS = [
     { id: "g1", name: "1. Về tư tưởng chính trị, đạo đức, lối sống, ý thức tổ chức kỷ luật..." },
-    { id: "g2", name: "2. Về kết quả thực hiện chức trách, nhiệm vụ được giao" },
-    { id: "g3", name: "3. Việc thực hiện cam kết tu dưỡng, rèn luyện, phấn đấu hằng năm" }
+    { id: "g2", name: "2. Về kết quả thực hiện chức trách, nhiệm vụ được giao" }
 ];
-
+const DEFAULT_SUBGROUPS = [
+    { id: "sg1_1", groupId: "g1", name: "1.1. Tư tưởng chính trị" },
+    { id: "sg1_2", groupId: "g1", name: "1.2. Phẩm chất đạo đức, lối sống" },
+    { id: "sg2_1", groupId: "g2", name: "2.1. Việc thực hiện nguyên tắc tập trung dân chủ..." }
+];
 const DEFAULT_ITEMS = [
-    { id: "tc1_1", groupId: "g1", name: "1.1. Tư tưởng chính trị", max: 5 },
-    { id: "tc1_2", groupId: "g1", name: "1.2. Phẩm chất đạo đức, lối sống", max: 5 },
-    { id: "tc1_3", groupId: "g1", name: "1.3. Ý thức tổ chức kỷ luật", max: 5 },
-    { id: "tc1_4", groupId: "g1", name: "1.4. Tác phong, lề lối làm việc", max: 5 },
-    { id: "tc2_1", groupId: "g2", name: "2.1. Việc thực hiện nguyên tắc tập trung dân chủ, các quy định, quy chế làm việc...", max: 15 },
-    { id: "tc2_2", groupId: "g2", name: "2.2. Kết quả lãnh đạo, chỉ đạo, tổ chức thực hiện các chỉ tiêu, nhiệm vụ...", max: 15 },
-    { id: "tc2_3", groupId: "g2", name: "2.3. Kết quả đánh giá, xếp loại các tổ chức, cơ quan, đơn vị...", max: 15 },
-    { id: "tc2_4", groupId: "g2", name: "2.4. Năng lực, uy tín; trách nhiệm nêu gương...", max: 15 },
-    { id: "tc3_1", groupId: "g3", name: "3.1. Mức độ thực hiện cam kết tu dưỡng, rèn luyện, phấn đấu hằng năm", max: 10 },
-    { id: "tc3_2", groupId: "g3", name: "3.2. Kết quả khắc phục những hạn chế, khuyết điểm...", max: 10 }
+    { id: "tc1", subGroupId: "sg1_1", name: "Trung thành với chủ nghĩa Mác - Lênin, tư tưởng Hồ Chí Minh...", max: 2.5 },
+    { id: "tc2", subGroupId: "sg1_1", name: "Thực hiện đúng các chủ trương, đường lối của Đảng...", max: 2.5 },
+    { id: "tc3", subGroupId: "sg1_2", name: "Không tham nhũng, quan liêu, cơ hội, vụ lợi...", max: 5 },
+    { id: "tc4", subGroupId: "sg2_1", name: "Chỉ đạo thực hiện tốt nhiệm vụ chuyên môn của đơn vị...", max: 15 }
 ];
 
 let CRITERIA_GROUPS = [];
+let CRITERIA_SUBGROUPS = [];
 let CRITERIA_ITEMS = []; 
+
 let currentStaffData = [];
 let userRole = 'guest'; 
 let isDhhpUser = false;
+let step3Voters = [];
 
 // DOM Elements
 const loginBtn = document.getElementById('loginBtn');
@@ -113,8 +113,9 @@ onAuthStateChanged(auth, async (user) => {
             if (adminDoc.exists()) {
                 userRole = 'admin'; userInfo.innerText = `Xin chào, ${userEmail} (Admin)`; 
                 document.getElementById('tabBtnAdmin').classList.remove('hidden');
-                document.getElementById('tabCritAdmin').classList.add('hidden'); 
-                document.getElementById('tabRoleAdmin').classList.add('hidden'); 
+                document.getElementById('tabCritAdmin').classList.remove('hidden'); 
+                document.getElementById('tabRoleAdmin').classList.remove('hidden'); 
+                listenToAdmins();
             } else {
                 userRole = 'guest'; userInfo.innerText = `Xin chào, ${userEmail} ${isDhhpUser ? "(Cán bộ trường)" : "(Khách)"}`;
             }
@@ -125,128 +126,157 @@ onAuthStateChanged(auth, async (user) => {
     renderAllViews();
 });
 
-// --- LẮNG NGHE & QUẢN LÝ TIÊU CHÍ (HỖ TRỢ PHÂN NHÓM) ---
+// --- LẮNG NGHE & QUẢN LÝ TIÊU CHÍ (3 CẤP) ---
 onSnapshot(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), async (docSnap) => {
     if (docSnap.exists()) { 
         const data = docSnap.data();
-        // Kiểm tra xem dữ liệu có phải là phiên bản cũ không (chỉ có array list)
-        if (Array.isArray(data.list) && !data.groups) {
-            CRITERIA_GROUPS = [{ id: "g_default", name: "Nhóm tiêu chí chung" }];
-            CRITERIA_ITEMS = data.list.map(i => ({ ...i, groupId: "g_default" }));
-            // Tự động nâng cấp lên format mới
-            await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: CRITERIA_GROUPS, items: CRITERIA_ITEMS });
-        } else {
-            CRITERIA_GROUPS = data.groups || [];
-            CRITERIA_ITEMS = data.items || [];
-        }
+        CRITERIA_GROUPS = Array.isArray(data.groups) ? data.groups : [];
+        CRITERIA_SUBGROUPS = Array.isArray(data.subGroups) ? data.subGroups : [];
+        CRITERIA_ITEMS = Array.isArray(data.items) ? data.items : [];
     } else { 
         CRITERIA_GROUPS = DEFAULT_GROUPS; 
+        CRITERIA_SUBGROUPS = DEFAULT_SUBGROUPS;
         CRITERIA_ITEMS = DEFAULT_ITEMS;
-        try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: CRITERIA_GROUPS, items: CRITERIA_ITEMS }); } catch(e) {}
+        try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: CRITERIA_GROUPS, subGroups: CRITERIA_SUBGROUPS, items: CRITERIA_ITEMS }); } catch(e) {}
     }
     renderCriteriaAdmin();
     if(document.getElementById('step1').classList.contains('active')) renderStep1();
 });
 
+onSnapshot(doc(db, "DaiHocHaiPhong_Config", "Step3Voters"), (docSnap) => {
+    if (docSnap.exists()) step3Voters = docSnap.data().emails || [];
+    else step3Voters = [];
+    renderStep3VotersAdmin();
+    renderVotingTable();
+});
+
 function renderCriteriaAdmin() {
-    // Cập nhật Dropdown chọn Nhóm
-    let groupOpts = '<option value="">-- Chọn Nhóm chứa tiêu chí này --</option>';
+    // Dropdown chọn Nhóm Lớn
+    let groupOpts = '<option value="">-- Chọn Nhóm Lớn --</option>';
     CRITERIA_GROUPS.forEach(g => { groupOpts += `<option value="${g.id}">${g.name}</option>`; });
-    document.getElementById('critGroupSelect').innerHTML = groupOpts;
+    document.getElementById('subGroup_groupSelect').innerHTML = groupOpts;
+
+    // Dropdown chọn Mục Con
+    let subGroupOpts = '<option value="">-- Chọn Mục Con chứa nó --</option>';
+    CRITERIA_SUBGROUPS.forEach(sg => { 
+        const parentName = CRITERIA_GROUPS.find(g => g.id === sg.groupId)?.name.substring(0,15) || "";
+        subGroupOpts += `<option value="${sg.id}">${sg.name} (${parentName}...)</option>`; 
+    });
+    document.getElementById('item_subGroupSelect').innerHTML = subGroupOpts;
 
     // Vẽ bảng cấu trúc
-    let html = '<table class="criteria-table"><tr><th width="15%">Mã</th><th>Nội dung tiêu chí / Nhóm</th><th width="15%">Điểm tối đa</th><th width="15%">Thao tác</th></tr>';
+    let html = '<table class="criteria-table"><tr><th>Cấu trúc Tiêu chí Đánh giá</th><th width="15%">Điểm tối đa</th><th width="20%">Thao tác</th></tr>';
     let totalMax = 0;
     
     CRITERIA_GROUPS.forEach(g => {
-        html += `<tr style="background:#f1f3f5;">
-            <td><strong>${g.id}</strong></td>
-            <td class="text-left" style="color:#0056b3;"><strong>${g.name}</strong></td>
+        html += `<tr style="background:#e9ecef; border-top: 2px solid #ccc;">
+            <td class="text-left" style="color:#333; font-size: 1.1em;"><strong>${g.name}</strong></td>
             <td></td>
-            <td><button class="action-btn btn-danger" onclick="removeGroup('${g.id}')">Xóa Nhóm</button></td>
+            <td>
+                <button class="action-btn btn-edit" onclick="editGroup('${g.id}')">Sửa</button>
+                <button class="action-btn btn-danger" onclick="removeGroup('${g.id}')">Xóa Nhóm</button>
+            </td>
         </tr>`;
         
-        const itemsInGroup = CRITERIA_ITEMS.filter(i => i.groupId === g.id);
-        itemsInGroup.forEach(c => {
-            totalMax += c.max || 0;
-            html += `<tr>
-                <td>${c.id}</td><td class="text-left" style="padding-left: 20px;">- ${c.name}</td><td>${c.max}</td>
+        const subGroups = CRITERIA_SUBGROUPS.filter(sg => sg.groupId === g.id);
+        subGroups.forEach(sg => {
+            html += `<tr style="background:#f8f9fa;">
+                <td class="text-left" style="color:#0056b3; padding-left: 30px;"><strong>${sg.name}</strong></td>
+                <td></td>
                 <td>
-                    <button class="action-btn btn-edit" onclick="editCriteria('${c.id}')">Sửa</button>
-                    <button class="action-btn btn-danger" onclick="removeCriteria('${c.id}')">Xóa</button>
+                    <button class="action-btn btn-edit" onclick="editSubGroup('${sg.id}')">Sửa</button>
+                    <button class="action-btn btn-danger" onclick="removeSubGroup('${sg.id}')">Xóa Mục</button>
                 </td>
             </tr>`;
+
+            const items = CRITERIA_ITEMS.filter(i => i.subGroupId === sg.id);
+            items.forEach(c => {
+                totalMax += c.max || 0;
+                html += `<tr>
+                    <td class="text-left" style="padding-left: 50px;">- ${c.name}</td>
+                    <td><strong style="color: red;">${c.max}</strong></td>
+                    <td>
+                        <button class="action-btn btn-edit" onclick="editItem('${c.id}')">Sửa</button>
+                        <button class="action-btn btn-danger" onclick="removeItem('${c.id}')">Xóa</button>
+                    </td>
+                </tr>`;
+            });
         });
     });
-    html += `<tr><td colspan="2" style="text-align:right"><strong>Tổng điểm hệ thống:</strong></td><td style="color:red; font-weight:bold; font-size:1.2em;">${totalMax}</td><td></td></tr></table>`;
+    html += `<tr><td style="text-align:right"><strong>Tổng điểm hệ thống:</strong></td><td style="color:red; font-weight:bold; font-size:1.2em;">${totalMax}</td><td></td></tr></table>`;
     document.getElementById('criteriaAdminList').innerHTML = html;
     if(document.getElementById('maxScoreDisplay')) document.getElementById('maxScoreDisplay').innerText = totalMax;
 }
 
-// 1. Thêm Nhóm Mới
+// 1. Thêm/Sửa/Xóa Nhóm Lớn
 document.getElementById('addGroupForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const id = document.getElementById('newGroupId').value.trim();
     const name = document.getElementById('newGroupName').value.trim();
-    if(CRITERIA_GROUPS.some(g => g.id === id)) return showMessage("Mã Nhóm đã tồn tại!", true);
-    
-    try {
-        await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: [...CRITERIA_GROUPS, { id, name }], items: CRITERIA_ITEMS });
-        document.getElementById('addGroupForm').reset(); showMessage("Đã tạo Nhóm!");
-    } catch(e) { handleFirebaseError(e); }
+    const id = "g_" + Date.now();
+    try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: [...CRITERIA_GROUPS, { id, name }], subGroups: CRITERIA_SUBGROUPS, items: CRITERIA_ITEMS }); document.getElementById('addGroupForm').reset(); showMessage("Đã tạo Nhóm Lớn!"); } catch(e) { handleFirebaseError(e); }
 });
-
-// Xóa Nhóm
-window.removeGroup = async function(groupId) {
-    if(!confirm("Xóa Nhóm này sẽ xóa TOÀN BỘ tiêu chí con bên trong nó. Bạn chắc chắn chứ?")) return;
-    const newGroups = CRITERIA_GROUPS.filter(g => g.id !== groupId);
-    const newItems = CRITERIA_ITEMS.filter(i => i.groupId !== groupId); // Xóa sạch con cái
-    try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: newGroups, items: newItems }); } 
-    catch(e) { handleFirebaseError(e); }
+window.editGroup = async function(id) {
+    const idx = CRITERIA_GROUPS.findIndex(g => g.id === id); if(idx === -1) return;
+    const newName = prompt("Sửa tên Nhóm Lớn:", CRITERIA_GROUPS[idx].name); if (!newName || newName.trim() === "") return;
+    const newArr = [...CRITERIA_GROUPS]; newArr[idx].name = newName.trim();
+    try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: newArr, subGroups: CRITERIA_SUBGROUPS, items: CRITERIA_ITEMS }); showMessage("Đã sửa Nhóm!"); } catch(e) { handleFirebaseError(e); }
+};
+window.removeGroup = async function(id) {
+    if(!confirm("Xóa Nhóm Lớn sẽ xóa TOÀN BỘ Mục con và Chi tiết bên trong. Chắc chắn xóa?")) return;
+    const newGroups = CRITERIA_GROUPS.filter(g => g.id !== id);
+    const newSubGroups = CRITERIA_SUBGROUPS.filter(sg => sg.groupId !== id);
+    const subGroupIds = CRITERIA_SUBGROUPS.filter(sg => sg.groupId === id).map(sg => sg.id);
+    const newItems = CRITERIA_ITEMS.filter(i => !subGroupIds.includes(i.subGroupId));
+    try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: newGroups, subGroups: newSubGroups, items: newItems }); showMessage("Đã xóa Nhóm!");} catch(e) { handleFirebaseError(e); }
 };
 
-// 2. Thêm Tiêu Chí Con
-document.getElementById('addCriteriaForm').addEventListener('submit', async (e) => {
+// 2. Thêm/Sửa/Xóa Mục Con
+document.getElementById('addSubGroupForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const groupId = document.getElementById('critGroupSelect').value;
-    const id = document.getElementById('newCritId').value.trim();
-    const name = document.getElementById('newCritName').value.trim();
-    const max = parseFloat(document.getElementById('newCritMax').value);
-    
-    if(!groupId) return showMessage("Vui lòng chọn Nhóm!", true);
-    if(CRITERIA_ITEMS.some(c => c.id === id)) return showMessage("Mã tiêu chí con đã tồn tại!", true);
-    
-    try {
-        await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: CRITERIA_GROUPS, items: [...CRITERIA_ITEMS, { id, groupId, name, max }] });
-        document.getElementById('addCriteriaForm').reset(); showMessage("Đã thêm tiêu chí con!");
-    } catch(e) { handleFirebaseError(e); }
+    const groupId = document.getElementById('subGroup_groupSelect').value;
+    const name = document.getElementById('newSubGroupName').value.trim();
+    if(!groupId) return showMessage("Chọn Nhóm lớn trước!", true);
+    const id = "sg_" + Date.now();
+    try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: CRITERIA_GROUPS, subGroups: [...CRITERIA_SUBGROUPS, { id, groupId, name }], items: CRITERIA_ITEMS }); document.getElementById('addSubGroupForm').reset(); showMessage("Đã tạo Mục Con!"); } catch(e) { handleFirebaseError(e); }
 });
+window.editSubGroup = async function(id) {
+    const idx = CRITERIA_SUBGROUPS.findIndex(sg => sg.id === id); if(idx === -1) return;
+    const newName = prompt("Sửa tên Mục Con:", CRITERIA_SUBGROUPS[idx].name); if (!newName || newName.trim() === "") return;
+    const newArr = [...CRITERIA_SUBGROUPS]; newArr[idx].name = newName.trim();
+    try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: CRITERIA_GROUPS, subGroups: newArr, items: CRITERIA_ITEMS }); showMessage("Đã sửa Mục Con!"); } catch(e) { handleFirebaseError(e); }
+};
+window.removeSubGroup = async function(id) {
+    if(!confirm("Xóa Mục Con sẽ xóa TOÀN BỘ Chi tiết bên trong. Chắc chắn xóa?")) return;
+    const newSubGroups = CRITERIA_SUBGROUPS.filter(sg => sg.id !== id);
+    const newItems = CRITERIA_ITEMS.filter(i => i.subGroupId !== id);
+    try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: CRITERIA_GROUPS, subGroups: newSubGroups, items: newItems }); showMessage("Đã xóa Mục Con!");} catch(e) { handleFirebaseError(e); }
+};
 
-// 3. Sửa & Xóa Tiêu Chí Con
-window.editCriteria = async function(id) {
-    const idx = CRITERIA_ITEMS.findIndex(c => c.id === id);
-    if(idx === -1) return;
+// 3. Thêm/Sửa/Xóa Tiêu Chí Chi Tiết
+document.getElementById('addItemForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const subGroupId = document.getElementById('item_subGroupSelect').value;
+    const name = document.getElementById('newItemName').value.trim();
+    const max = parseFloat(document.getElementById('newItemMax').value);
+    if(!subGroupId) return showMessage("Chọn Mục Con trước!", true);
+    const id = "tc_" + Date.now();
+    try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: CRITERIA_GROUPS, subGroups: CRITERIA_SUBGROUPS, items: [...CRITERIA_ITEMS, { id, subGroupId, name, max }] }); document.getElementById('addItemForm').reset(); showMessage("Đã thêm Chi tiết điểm!"); } catch(e) { handleFirebaseError(e); }
+});
+window.editItem = async function(id) {
+    const idx = CRITERIA_ITEMS.findIndex(i => i.id === id); if(idx === -1) return;
     const crit = CRITERIA_ITEMS[idx];
-    
-    const newName = prompt("Nhập nội dung tiêu chí mới:", crit.name);
-    if (newName === null || newName.trim() === "") return;
-    const newMaxStr = prompt("Nhập điểm tối đa mới:", crit.max);
-    if (newMaxStr === null) return;
-    const newMax = parseFloat(newMaxStr);
-    if (isNaN(newMax)) return showMessage("Điểm phải là số hợp lệ!", true);
-
-    const newItems = [...CRITERIA_ITEMS];
-    newItems[idx] = { ...crit, name: newName.trim(), max: newMax };
-    try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: CRITERIA_GROUPS, items: newItems }); showMessage("Đã sửa tiêu chí con!"); } 
-    catch(e) { handleFirebaseError(e); }
+    const newName = prompt("Nội dung chi tiết mới:", crit.name); if (!newName || newName.trim() === "") return;
+    const newMaxStr = prompt("Điểm tối đa mới:", crit.max); if (newMaxStr === null) return;
+    const newMax = parseFloat(newMaxStr); if (isNaN(newMax)) return showMessage("Điểm phải là số!", true);
+    const newArr = [...CRITERIA_ITEMS]; newArr[idx] = { ...crit, name: newName.trim(), max: newMax };
+    try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: CRITERIA_GROUPS, subGroups: CRITERIA_SUBGROUPS, items: newArr }); showMessage("Đã sửa Chi tiết!"); } catch(e) { handleFirebaseError(e); }
 };
-
-window.removeCriteria = async function(id) {
-    if(!confirm("Xóa tiêu chí con này?")) return;
+window.removeItem = async function(id) {
+    if(!confirm("Xóa dòng chi tiết này?")) return;
     const newItems = CRITERIA_ITEMS.filter(c => c.id !== id);
-    try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: CRITERIA_GROUPS, items: newItems }); } 
-    catch(e) { handleFirebaseError(e); }
+    try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "TieuChi"), { groups: CRITERIA_GROUPS, subGroups: CRITERIA_SUBGROUPS, items: newItems }); } catch(e) { handleFirebaseError(e); }
 };
+
 
 // --- DATA LISTENER TỔNG & RENDER ---
 onSnapshot(collection(db, "DaiHocHaiPhong_NhanSu"), (snapshot) => {
@@ -284,10 +314,15 @@ function renderAdminStaffTable() {
     currentStaffData.forEach(dept => {
         html += `<tr class="dept-row"><td colspan="4">${dept.department} ${dept.headEmail ? ` <small style="color:red">(Phụ trách: ${dept.headEmail})</small>` : ''}</td></tr>`;
         dept.members.forEach(staff => {
+            const hasEmail = staff.email && staff.email.trim() !== '';
             html += `<tr>
                 <td></td><td class="text-left"><strong>${staff.name}</strong></td>
-                <td>${staff.email || '<span style="color:#dc3545; font-style:italic">Chưa có email</span>'}</td>
-                <td><button class="action-btn btn-edit" onclick="editStaff('${dept.id}', '${staff.id}')">Sửa</button><button class="action-btn btn-danger" onclick="deleteStaff('${dept.id}', '${staff.id}')">Xóa</button></td>
+                <td>${hasEmail ? staff.email : '<span style="color:#dc3545; font-style:italic">Chưa có email</span>'}</td>
+                <td>
+                    <button class="action-btn btn-edit" onclick="editStaffName('${dept.id}', '${staff.id}')">Sửa Tên</button>
+                    <button class="action-btn btn-success" onclick="assignStaffEmail('${dept.id}', '${staff.id}')">${hasEmail ? 'Sửa Email' : 'Gán Email'}</button>
+                    <button class="action-btn btn-danger" onclick="deleteStaff('${dept.id}', '${staff.id}')">Xóa</button>
+                </td>
             </tr>`;
         });
     });
@@ -324,20 +359,36 @@ document.getElementById('addStaffForm').addEventListener('submit', async (e) => 
     } catch(e) { handleFirebaseError(e); }
 });
 
-window.editStaff = async function(deptId, staffId) {
+window.editStaffName = async function(deptId, staffId) {
     const dept = currentStaffData.find(d => d.id === deptId);
-    if(!dept || !dept.members) return;
+    if (!dept || !dept.members) return;
     const staff = dept.members.find(m => m.id === staffId);
-    if(!staff) return;
+    if (!staff) return;
 
     const newName = prompt("Sửa Họ và Tên:", staff.name);
-    if(newName === null) return;
-    const newEmail = prompt("Sửa Email (có thể để trống):", staff.email || "");
-    if(newEmail === null) return;
+    if (newName === null || newName.trim() === "") return;
 
-    const updatedMembers = dept.members.map(m => m.id === staffId ? { ...m, name: newName.trim(), email: newEmail.trim() } : m);
-    try { await updateDoc(doc(db, "DaiHocHaiPhong_NhanSu", deptId), { members: updatedMembers }); showMessage("Đã sửa thông tin!"); } 
-    catch(e) { handleFirebaseError(e); }
+    const updatedMembers = dept.members.map(m => m.id === staffId ? { ...m, name: newName.trim() } : m);
+    try {
+        await updateDoc(doc(db, "DaiHocHaiPhong_NhanSu", deptId), { members: updatedMembers });
+        showMessage("Đã sửa tên nhân viên!");
+    } catch (e) { handleFirebaseError(e); }
+};
+
+window.assignStaffEmail = async function(deptId, staffId) {
+    const dept = currentStaffData.find(d => d.id === deptId);
+    if (!dept || !dept.members) return;
+    const staff = dept.members.find(m => m.id === staffId);
+    if (!staff) return;
+
+    const newEmail = prompt(`Nhập email cho nhân viên "${staff.name}":`, staff.email || "");
+    if (newEmail === null) return; // User cancelled
+
+    const updatedMembers = dept.members.map(m => m.id === staffId ? { ...m, email: newEmail.trim() } : m);
+    try {
+        await updateDoc(doc(db, "DaiHocHaiPhong_NhanSu", deptId), { members: updatedMembers });
+        showMessage("Đã cập nhật email!");
+    } catch (e) { handleFirebaseError(e); }
 };
 
 window.deleteStaff = async function(deptDocId, staffId) {
@@ -351,6 +402,41 @@ window.deleteStaff = async function(deptDocId, staffId) {
 };
 
 // --- PHÂN QUYỀN ---
+function listenToAdmins() {
+    onSnapshot(collection(db, "DaiHocHaiPhong_Admins"), (snapshot) => {
+        let html = `<div class="admin-item" style="background-color: #f1f8ff; padding: 8px; border-radius: 4px; margin-bottom: 5px;">
+            <span><strong>${SUPER_ADMIN_EMAIL}</strong> <span style="color:#dc3545; font-size:0.9em">(Super Admin)</span></span>
+            <span style="color:#28a745; font-size:12px; font-style:italic;">Mặc định (Không thể gỡ)</span>
+        </div>`;
+        snapshot.forEach(doc => {
+            const email = doc.id;
+            html += `<div class="admin-item" style="padding: 8px;">
+                <span><strong>${email}</strong> <span style="color:#0056b3; font-size:0.9em">(Admin)</span></span>
+                ${userRole === 'superadmin' ? `<button class="action-btn btn-danger" onclick="removeAdmin('${email}')">Gỡ quyền</button>` : ''}
+            </div>`;
+        });
+        const adminListDiv = document.getElementById('adminList');
+        if (adminListDiv) adminListDiv.innerHTML = html;
+    });
+}
+
+function renderStep3VotersAdmin() {
+    let html = '';
+    step3Voters.forEach(email => {
+        html += `<div class="admin-item" style="padding: 8px;">
+            <span><strong>${email}</strong></span>
+            ${userRole === 'superadmin' || userRole === 'admin' ? `<button class="action-btn btn-danger" onclick="removeStep3Voter('${email}')">Xóa</button>` : ''}
+        </div>`;
+    });
+    const listDiv = document.getElementById('step3VoterList');
+    if (listDiv) listDiv.innerHTML = html;
+}
+document.getElementById('addStep3VoterForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault(); const email = document.getElementById('newStep3VoterEmail').value.trim();
+    if (!step3Voters.includes(email)) { try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "Step3Voters"), { emails: [...step3Voters, email] }); document.getElementById('addStep3VoterForm').reset(); } catch(e) { handleFirebaseError(e); } }
+});
+window.removeStep3Voter = async function(email) { if(!confirm(`Xóa quyền của ${email}?`)) return; try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "Step3Voters"), { emails: step3Voters.filter(e => e !== email) }); } catch(e) { handleFirebaseError(e); } };
+
 document.getElementById('addAdminForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const newEmail = document.getElementById('newAdminEmail').value.trim();
@@ -359,6 +445,7 @@ document.getElementById('addAdminForm').addEventListener('submit', async (e) => 
     catch(e) { handleFirebaseError(e); }
 });
 window.removeAdmin = async function(email) {
+    if (userRole !== 'superadmin') return showMessage("Bạn không có quyền thực hiện hành động này.", true);
     if(email === SUPER_ADMIN_EMAIL) return;
     if(confirm(`Gỡ quyền của ${email}?`)) await deleteDoc(doc(db, "DaiHocHaiPhong_Admins", email));
 };
@@ -371,7 +458,7 @@ document.getElementById('assignHeadForm').addEventListener('submit', async (e) =
     catch(e) { handleFirebaseError(e); }
 });
 
-// --- BƯỚC 1: CÁ NHÂN TỰ ĐÁNH GIÁ (HIỂN THỊ THEO NHÓM) ---
+// --- BƯỚC 1: CÁ NHÂN TỰ ĐÁNH GIÁ (HIỂN THỊ THEO NHÓM 3 CẤP) ---
 function renderStep1() {
     const step1Content = document.getElementById('step1Content');
     const selfScoreForm = document.getElementById('selfScoreForm');
@@ -394,28 +481,37 @@ function renderStep1() {
     }
 
     step1Content.innerHTML = ''; selfScoreForm.classList.remove('hidden');
+    document.getElementById('step1MetaControls').style.display = 'flex';
     document.getElementById('selfDeptId').value = myDept.id;
     document.getElementById('selfStaffId').value = myProfile.id;
     document.getElementById('selfDeptName').value = myDept.department;
     document.getElementById('selfStaffName').value = myProfile.name;
+    if(myProfile.selfQuarter) document.getElementById('selfQuarter').value = myProfile.selfQuarter;
+    if(myProfile.selfYear) document.getElementById('selfYear').value = myProfile.selfYear;
+    if(myProfile.selfClassification) document.getElementById('selfClassification').value = myProfile.selfClassification;
     
     let criteriaHtml = `<table class="criteria-table"><thead><tr><th>Nội dung tiêu chí đánh giá</th><th width="15%">Điểm tối đa</th><th width="15%">Điểm tự chấm</th></tr></thead><tbody>`;
     const savedScores = myProfile.criteriaScores || {}; 
     
     if(CRITERIA_GROUPS.length === 0) criteriaHtml += `<tr><td colspan="3">Chưa có cấu hình tiêu chí. Vui lòng báo Quản trị viên.</td></tr>`;
     
-    // Đổ dữ liệu theo Nhóm -> Tiêu chí con
+    // Đổ dữ liệu theo Nhóm (Cấp 1) -> Mục con (Cấp 2) -> Chi tiết (Cấp 3)
     CRITERIA_GROUPS.forEach(g => {
-        criteriaHtml += `<tr style="background:#f8f9fa;"><td colspan="3" class="text-left" style="font-weight:bold; color:#0056b3;">${g.name}</td></tr>`;
-        const items = CRITERIA_ITEMS.filter(i => i.groupId === g.id);
+        criteriaHtml += `<tr style="background:#e9ecef; border-top: 2px solid #ccc;"><td colspan="3" class="text-left" style="font-size: 1.1em; font-weight:bold; color:#333;">${g.name}</td></tr>`;
         
-        items.forEach(tc => {
-            const val = savedScores[tc.id] !== undefined ? savedScores[tc.id] : '';
-            criteriaHtml += `<tr>
-                <td class="text-left" style="padding-left: 20px;">${tc.name}</td>
-                <td style="font-weight:bold;">${tc.max}</td>
-                <td><input type="number" class="crit-input" data-id="${tc.id}" data-max="${tc.max}" value="${val}" min="0" max="${tc.max}" step="0.5" required></td>
-            </tr>`;
+        const subGroups = CRITERIA_SUBGROUPS.filter(sg => sg.groupId === g.id);
+        subGroups.forEach(sg => {
+            criteriaHtml += `<tr style="background:#f8f9fa;"><td colspan="3" class="text-left" style="font-weight:bold; color:#0056b3; padding-left: 30px;">${sg.name}</td></tr>`;
+            
+            const items = CRITERIA_ITEMS.filter(i => i.subGroupId === sg.id);
+            items.forEach(tc => {
+                const val = savedScores[tc.id] !== undefined ? savedScores[tc.id] : '';
+                criteriaHtml += `<tr>
+                    <td class="text-left" style="padding-left: 50px;">- ${tc.name}</td>
+                    <td style="font-weight:bold;">${tc.max}</td>
+                    <td><input type="number" class="crit-input" data-id="${tc.id}" data-max="${tc.max}" value="${val}" min="0" max="${tc.max}" step="0.5" required></td>
+                </tr>`;
+            });
         });
     });
     
@@ -441,48 +537,65 @@ document.getElementById('selfScoreForm').addEventListener('submit', async (e) =>
     const deptId = document.getElementById('selfDeptId').value;
     const staffId = document.getElementById('selfStaffId').value;
     const totalScore = parseFloat(document.getElementById('selfScoreInput').value);
+    const selfQuarter = document.getElementById('selfQuarter').value;
+    const selfYear = document.getElementById('selfYear').value;
+    const selfClassification = document.getElementById('selfClassification').value;
     
     const criteriaScores = {};
     document.querySelectorAll('.crit-input').forEach(input => { criteriaScores[input.dataset.id] = parseFloat(input.value) || 0; });
 
     const deptDoc = currentStaffData.find(d => d.id === deptId);
     if(!deptDoc || !deptDoc.members) return;
-    const updatedMembers = deptDoc.members.map(m => m.id === staffId ? { ...m, score: totalScore, criteriaScores: criteriaScores } : m);
+    const updatedMembers = deptDoc.members.map(m => m.id === staffId ? { ...m, score: totalScore, criteriaScores: criteriaScores, selfQuarter, selfYear, selfClassification } : m);
     
     try { await updateDoc(doc(db, "DaiHocHaiPhong_NhanSu", deptId), { members: updatedMembers }); showMessage("Đã lưu bảng điểm tự đánh giá!"); } 
     catch(e) { handleFirebaseError(e); }
 });
 
-// --- BƯỚC 2 & 3: BẢN CŨ GIỮ NGUYÊN (Lưu/Duyệt Điểm) ---
+// --- BƯỚC 2: TRƯỞNG ĐƠN VỊ ĐỀ XUẤT ---
 const deptProposalForm = document.getElementById('deptProposalForm');
 const proposalTableBody = document.getElementById('proposalTableBody');
 const step2AuthMessage = document.getElementById('step2AuthMessage');
 
 function renderStep2() {
     if (!auth.currentUser || !isDhhpUser) {
-        step2AuthMessage.innerText = "Đăng nhập bằng tài khoản @dhhp.edu.vn để duyệt.";
+        step2AuthMessage.innerText = "Đăng nhập bằng tài khoản @dhhp.edu.vn để tham gia bình bầu.";
         deptProposalForm.classList.add('hidden'); return;
     }
     const userEmail = auth.currentUser.email;
-    const myDepts = currentStaffData.filter(d => d.headEmail === userEmail);
-    if (myDepts.length === 0) {
-        step2AuthMessage.innerText = "Tài khoản của bạn CHƯA được phân quyền duyệt.";
+    const involvedDepts = currentStaffData.filter(d => d.headEmail === userEmail || (d.members && d.members.some(m => m.email === userEmail)));
+    
+    if (involvedDepts.length === 0) {
+        step2AuthMessage.innerText = "Tài khoản của bạn CHƯA thuộc phòng ban nào để bình bầu.";
         step2AuthMessage.style.color = "#dc3545"; deptProposalForm.classList.add('hidden'); return;
     }
 
-    step2AuthMessage.innerText = `Quyền Trưởng đơn vị: ${userEmail}`;
+    step2AuthMessage.innerText = `Khu vực Bình bầu của bạn`;
     step2AuthMessage.style.color = "#28a745"; deptProposalForm.classList.remove('hidden');
 
     let html = '';
-    myDepts.forEach(dept => {
-        html += `<tr class="dept-row"><td colspan="4">Khu vực đánh giá: ${dept.department}</td></tr>`;
+    involvedDepts.forEach(dept => {
+        const isHead = dept.headEmail === userEmail;
+        html += `<tr class="dept-row"><td colspan="6">Khu vực: ${dept.department} ${isHead ? '(Bạn là Trưởng đơn vị)' : '(Thành viên)'}</td></tr>`;
         (dept.members || []).forEach((m, index) => {
+            const myPeerVote = (m.peerVotes || {})[userEmail] || '';
+            const selfClass = m.selfClassification ? `<span style="color:#17a2b8; font-weight:bold">${m.selfClassification}</span>` : 'Chưa chọn';
             html += `<tr>
                 <td>${index + 1}</td><td class="text-left">${m.name}</td>
                 <td><strong style="color:red; font-size:1.1em">${m.score !== undefined && m.score !== "" ? m.score : 'Chưa chấm'}</strong></td>
+                <td>${selfClass}</td>
                 <td>
-                    <select name="prop_${dept.id}_${m.id}" class="prop-select" style="padding: 5px; width: 100%;">
-                        <option value="">-- Chọn mức --</option>
+                    <select name="peer_${dept.id}_${m.id}" style="padding: 5px; width: 100%;">
+                        <option value="">-- Bình bầu --</option>
+                        <option value="HTXSNV" ${myPeerVote === 'HTXSNV' ? 'selected' : ''}>Hoàn thành Xuất sắc</option>
+                        <option value="HTTNV" ${myPeerVote === 'HTTNV' ? 'selected' : ''}>Hoàn thành Tốt</option>
+                        <option value="HTNV" ${myPeerVote === 'HTNV' ? 'selected' : ''}>Hoàn thành NV</option>
+                        <option value="KHTNV" ${myPeerVote === 'KHTNV' ? 'selected' : ''}>Không HTNV</option>
+                    </select>
+                </td>
+                <td>
+                    <select name="prop_${dept.id}_${m.id}" style="padding: 5px; width: 100%; background: ${isHead ? '#fff' : '#e9ecef'};" ${isHead ? '' : 'disabled'}>
+                        <option value="">-- Trưởng ĐV chốt --</option>
                         <option value="HTXSNV" ${m.proposed === 'HTXSNV' ? 'selected' : ''}>Hoàn thành Xuất sắc</option>
                         <option value="HTTNV" ${m.proposed === 'HTTNV' ? 'selected' : ''}>Hoàn thành Tốt</option>
                         <option value="HTNV" ${m.proposed === 'HTNV' ? 'selected' : ''}>Hoàn thành NV</option>
@@ -496,13 +609,18 @@ function renderStep2() {
 }
 deptProposalForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const userEmail = auth.currentUser.email; const myDepts = currentStaffData.filter(d => d.headEmail === userEmail);
+    const userEmail = auth.currentUser.email; 
+    const involvedDepts = currentStaffData.filter(d => d.headEmail === userEmail || (d.members && d.members.some(m => m.email === userEmail)));
     const formData = new FormData(deptProposalForm);
     try {
-        for (const dept of myDepts) {
+        for (const dept of involvedDepts) {
+            const isHead = dept.headEmail === userEmail;
             const updatedMembers = (dept.members || []).map(m => {
+                const peerVal = formData.get(`peer_${dept.id}_${m.id}`);
                 const propValue = formData.get(`prop_${dept.id}_${m.id}`);
-                return { ...m, proposed: propValue || m.proposed || "" };
+                let newPeerVotes = { ...(m.peerVotes || {}) };
+                if (peerVal) newPeerVotes[userEmail] = peerVal; else delete newPeerVotes[userEmail];
+                return { ...m, peerVotes: newPeerVotes, proposed: isHead ? (propValue || m.proposed || "") : (m.proposed || "") };
             });
             await updateDoc(doc(db, "DaiHocHaiPhong_NhanSu", dept.id), { members: updatedMembers });
         }
@@ -510,30 +628,47 @@ deptProposalForm.addEventListener('submit', async (e) => {
     } catch(e) { handleFirebaseError(e); }
 });
 
+// --- BƯỚC 3: BỎ PHIẾU ĐẢNG ỦY ---
 const tableContainer = document.getElementById('tableContainer');
 const voteTypeSelect = document.getElementById('voteType');
 function renderVotingTable() {
     if(currentStaffData.length === 0) { tableContainer.innerHTML = "<p style='text-align:center;'>Chưa có dữ liệu.</p>"; document.getElementById('submitBtn').disabled = true; return; }
+    
+    const userEmail = auth.currentUser ? auth.currentUser.email : '';
+    const canVote = userRole === 'superadmin' || step3Voters.includes(userEmail);
+    
     const voteType = voteTypeSelect.value;
-    let html = `<table class="criteria-table"><thead><tr><th width="5%">TT</th><th width="25%">Họ tên</th><th width="10%">Điểm CN</th><th width="15%">Đề xuất ĐV</th>`;
+    let html = `<table class="criteria-table"><thead><tr><th width="5%">TT</th><th width="20%">Họ tên</th><th width="8%">Điểm</th><th width="12%">Tự Nhận</th><th width="15%">Đề xuất ĐV</th>`;
     if (voteType === 'xeploai') html += `<th width="13%">HTXSNV</th><th width="13%">HTTNV</th><th width="13%">HTNV</th>`;
     else html += `<th width="20%">Tín nhiệm</th><th width="20%">Không tín nhiệm</th>`;
     html += `</tr></thead><tbody>`;
 
     currentStaffData.forEach(dept => {
-        html += `<tr class="dept-row"><td colspan="4">${dept.department}</td>${voteType === 'xeploai' ? '<td colspan="3"></td>' : '<td colspan="2"></td>'}</tr>`;
+        html += `<tr class="dept-row"><td colspan="5">${dept.department}</td>${voteType === 'xeploai' ? '<td colspan="3"></td>' : '<td colspan="2"></td>'}</tr>`;
         (dept.members || []).forEach((staff, index) => {
             html += `<tr><td>${index + 1}</td><td class="text-left" style="font-weight:bold;">${staff.name}</td>
                 <td><strong style="color:red">${staff.score !== undefined && staff.score !== "" ? staff.score : ''}</strong></td>
+                <td><span style="color:#17a2b8; font-weight:bold;">${staff.selfClassification || ''}</span></td>
                 <td style="font-weight:bold; color:#0056b3">${staff.proposed || ''}</td>`;
-            if (voteType === 'xeploai') { html += `<td><input type="radio" name="vote_${staff.id}" value="HTXSNV" required></td><td><input type="radio" name="vote_${staff.id}" value="HTTNV"></td><td><input type="radio" name="vote_${staff.id}" value="HTNV"></td>`; } 
-            else { html += `<td><input type="radio" name="vote_${staff.id}" value="Tín nhiệm" required></td><td><input type="radio" name="vote_${staff.id}" value="Không tín nhiệm"></td>`; }
+            if (canVote) {
+                if (voteType === 'xeploai') { html += `<td><input type="radio" name="vote_${staff.id}" value="HTXSNV" required></td><td><input type="radio" name="vote_${staff.id}" value="HTTNV"></td><td><input type="radio" name="vote_${staff.id}" value="HTNV"></td>`; } 
+                else { html += `<td><input type="radio" name="vote_${staff.id}" value="Tín nhiệm" required></td><td><input type="radio" name="vote_${staff.id}" value="Không tín nhiệm"></td>`; }
+            } else {
+                if (voteType === 'xeploai') { html += `<td colspan="3"><span style="color:#ccc">Không có quyền</span></td>`; } 
+                else { html += `<td colspan="2"><span style="color:#ccc">Không có quyền</span></td>`; }
+            }
             html += `</tr>`;
         });
     });
     html += `</tbody></table>`;
     tableContainer.innerHTML = html;
-    document.getElementById('submitBtn').disabled = false;
+    if(canVote) {
+        document.getElementById('submitBtn').disabled = false;
+        document.getElementById('submitBtn').innerText = "Gửi phiếu đánh giá cấp Đảng ủy";
+    } else {
+        document.getElementById('submitBtn').disabled = true;
+        document.getElementById('submitBtn').innerText = "Tài khoản của bạn không có quyền bỏ phiếu";
+    }
 }
 voteTypeSelect.addEventListener('change', renderVotingTable);
 
@@ -550,6 +685,55 @@ document.getElementById('votingForm').addEventListener('submit', async (e) => {
     finally { submitBtn.disabled = false; submitBtn.innerText = "Gửi phiếu đánh giá"; }
 });
 
+// --- XEM VÀ XUẤT KẾT QUẢ BƯỚC 3 ---
+document.getElementById('loadResultsBtn')?.addEventListener('click', async () => {
+    const q = document.getElementById('resQuarter').value;
+    const y = document.getElementById('resYear').value;
+    const resArea = document.getElementById('resultsDisplayArea');
+    resArea.innerHTML = "Đang tải dữ liệu...";
+
+    try {
+        const qSnap = await getDocs(query(collection(db, "DaiHocHaiPhong_BoPhieu"), where("quy", "==", q), where("nam", "==", y)));
+        if(qSnap.empty) { resArea.innerHTML = "<p>Không có dữ liệu bỏ phiếu cho Quý/Năm này.</p>"; return; }
+        
+        const tally = {}; 
+        let totalVotes = 0;
+        
+        qSnap.forEach(doc => {
+            totalVotes++;
+            const data = doc.data();
+            (data.details || []).forEach(d => {
+                if(!tally[d.staffId]) tally[d.staffId] = { name: d.staffName, dept: d.department, HTXSNV: 0, HTTNV: 0, HTNV: 0, KHTNV: 0, "Tín nhiệm": 0, "Không tín nhiệm": 0 };
+                if (tally[d.staffId][d.vote] !== undefined) tally[d.staffId][d.vote]++;
+            });
+        });
+
+        let html = `<p>Tổng số phiếu đã thu trong <strong>Quý ${q} - Năm ${y}</strong>: <strong>${totalVotes} phiếu</strong></p>`;
+        html += `<table class="criteria-table" id="exportTable"><thead><tr><th>Đơn vị</th><th>Họ tên</th><th>HTXSNV</th><th>HTTNV</th><th>HTNV</th><th>KHTNV</th><th>Tín nhiệm</th><th>Không TN</th></tr></thead><tbody>`;
+        
+        const depts = [...new Set(Object.values(tally).map(t => t.dept))].sort();
+        depts.forEach(deptName => {
+            html += `<tr class="dept-row"><td colspan="8">${deptName}</td></tr>`;
+            Object.values(tally).filter(t => t.dept === deptName).forEach(t => {
+                html += `<tr><td></td><td class="text-left"><strong>${t.name}</strong></td><td>${t.HTXSNV}</td><td>${t.HTTNV}</td><td>${t.HTNV}</td><td>${t.KHTNV}</td><td>${t["Tín nhiệm"]}</td><td>${t["Không tín nhiệm"]}</td></tr>`;
+            });
+        });
+        html += `</tbody></table>`;
+        resArea.innerHTML = html;
+    } catch(e) { handleFirebaseError(e); }
+});
+
+document.getElementById('exportResultsBtn')?.addEventListener('click', () => {
+    const table = document.getElementById('exportTable');
+    if(!table) return alert("Vui lòng Bấm 'Tải Kết quả' trước khi xuất!");
+    let csv = []; const rows = table.querySelectorAll("tr");
+    for (let i = 0; i < rows.length; i++) { let row = [], cols = rows[i].querySelectorAll("td, th"); for (let j = 0; j < cols.length; j++) row.push('"' + cols[j].innerText.replace(/"/g, '""') + '"'); csv.push(row.join(",")); }
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob(["\uFEFF"+csv.join("\n")], {type: "text/csv;charset=utf-8;"}));
+    link.download = `KetQuaBoPhieu_Q${document.getElementById('resQuarter').value}_${document.getElementById('resYear').value}.csv`; link.click();
+});
+
+// Chức năng Backup (Tạo sẵn 1 dòng để Test)
 document.getElementById('seedDataBtn').addEventListener('click', async () => {
     if(!confirm("Khôi phục sẽ thêm 1 khoa mẫu vào cuối cùng. Bạn đã xóa Collection trên Firebase chưa?")) return;
     try {

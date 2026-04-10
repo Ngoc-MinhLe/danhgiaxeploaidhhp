@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <img src="banner.jpg" alt="Banner Hệ Thống Đánh Giá" class="top-banner">
     <div class="top-bar">
         <div id="userInfo">Bạn chưa đăng nhập</div>
         <button id="loginBtn" class="btn-secondary">Đăng nhập (Google)</button>
@@ -32,7 +33,7 @@
         <div id="stepAdmin" class="tab-content">
             <div class="admin-tabs">
                 <button class="admin-tab-btn active" data-target="admin-staff">👥 Quản lý Nhân sự</button>
-                <button class="admin-tab-btn" data-target="admin-criteria" id="tabCritAdmin">📋 Cấu hình Tiêu chí</button>
+                <button class="admin-tab-btn" data-target="admin-criteria" id="tabCritAdmin">📋 Cấu hình Tiêu chí 3 Cấp</button>
                 <button class="admin-tab-btn" data-target="admin-roles" id="tabRoleAdmin">🔑 Phân quyền Hệ thống</button>
             </div>
 
@@ -55,29 +56,38 @@
             </div>
 
             <div id="admin-criteria" class="admin-tab-content">
-                <h3 class="admin-section-title">Cấu trúc Bộ Tiêu chí Đánh giá</h3>
-                <div style="display:flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px;">
-                    <div style="flex:1; min-width: 300px; background: #e9ecef; padding: 15px; border-radius: 5px;">
-                        <strong>A. Thêm Nhóm Tiêu Chí Lớn:</strong>
-                        <form id="addGroupForm" class="add-form" style="margin-top: 10px;">
-                            <input type="text" id="newGroupId" placeholder="Mã Nhóm (vd: g1)" required style="width: 30%;">
-                            <input type="text" id="newGroupName" placeholder="Tên Nhóm (vd: 1. Tư tưởng chính trị...)" required style="width: 65%;">
-                            <button type="submit" class="btn-primary" style="margin-top: 5px; width: 100%;">Tạo Nhóm</button>
+                <h3 class="admin-section-title">Xây dựng Cấu trúc Bộ Tiêu chí Đánh giá</h3>
+                <p style="font-size: 0.9em; color: #555; margin-bottom: 15px;"><em>Lưu ý: Hệ thống tự động tạo Mã ẩn, bạn chỉ cần nhập tên. Xây dựng theo thứ tự: Thêm Nhóm Lớn -> Thêm Mục Con -> Thêm Chi tiết điểm.</em></p>
+                
+                <div style="display:flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px;">
+                    <div style="flex:1; min-width: 250px; background: #e9ecef; padding: 15px; border-radius: 5px; border-left: 4px solid #6c757d;">
+                        <strong style="color:#333;">1. Thêm Nhóm Lớn (VD: Nhóm 1)</strong>
+                        <form id="addGroupForm" class="add-form" style="margin-top: 10px; flex-direction: column;">
+                            <input type="text" id="newGroupName" placeholder="Tên Nhóm Lớn" required style="width: 100%;">
+                            <button type="submit" class="btn-secondary" style="margin-top: 5px; width: 100%;">+ Tạo Nhóm Lớn</button>
                         </form>
                     </div>
-                    <div style="flex:2; min-width: 400px; background: #d1ecf1; padding: 15px; border-radius: 5px; border: 1px solid #bee5eb;">
-                        <strong>B. Thêm Tiêu Chí Con (Được chấm điểm):</strong>
-                        <form id="addCriteriaForm" class="add-form" style="margin-top: 10px;">
-                            <select id="critGroupSelect" required style="width: 100%; margin-bottom: 5px;"><option value="">-- Chọn Nhóm chứa tiêu chí này --</option></select>
-                            <div style="display:flex; gap: 5px; width: 100%;">
-                                <input type="text" id="newCritId" placeholder="Mã (vd: tc1_1)" required style="width: 20%;">
-                                <input type="text" id="newCritName" placeholder="Nội dung tiêu chí" required style="width: 55%;">
-                                <input type="number" step="0.5" id="newCritMax" placeholder="Điểm TĐ" required style="width: 20%;">
-                            </div>
-                            <button type="submit" class="btn-success" style="margin-top: 5px; width: 100%;">Thêm Tiêu chí Con</button>
+
+                    <div style="flex:1; min-width: 250px; background: #d1ecf1; padding: 15px; border-radius: 5px; border-left: 4px solid #17a2b8;">
+                        <strong style="color:#0c5460;">2. Thêm Mục Con (VD: Mục 1.1)</strong>
+                        <form id="addSubGroupForm" class="add-form" style="margin-top: 10px; flex-direction: column;">
+                            <select id="subGroup_groupSelect" required style="width: 100%; margin-bottom: 5px;"><option value="">-- Chọn Nhóm Lớn --</option></select>
+                            <input type="text" id="newSubGroupName" placeholder="Tên Mục Con" required style="width: 100%;">
+                            <button type="submit" class="btn-info" style="margin-top: 5px; width: 100%; background: #17a2b8; color: white; border: none; padding: 10px; border-radius: 4px;">+ Tạo Mục Con</button>
+                        </form>
+                    </div>
+
+                    <div style="flex:1; min-width: 250px; background: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
+                        <strong style="color:#155724;">3. Thêm Chi Tiết Cho Điểm</strong>
+                        <form id="addItemForm" class="add-form" style="margin-top: 10px; flex-direction: column;">
+                            <select id="item_subGroupSelect" required style="width: 100%; margin-bottom: 5px;"><option value="">-- Chọn Mục Con chứa nó --</option></select>
+                            <textarea id="newItemName" placeholder="Nội dung đánh giá chi tiết..." required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 5px; resize: vertical; min-height: 50px;"></textarea>
+                            <input type="number" step="0.5" id="newItemMax" placeholder="Điểm Tối Đa" required style="width: 100%;">
+                            <button type="submit" class="btn-success" style="margin-top: 5px; width: 100%;">+ Thêm Chi Tiết Điểm</button>
                         </form>
                     </div>
                 </div>
+                
                 <div id="criteriaAdminList">Đang tải cấu trúc tiêu chí...</div>
             </div>
 
@@ -100,6 +110,14 @@
                             <button type="submit" class="btn-primary" style="margin-top: 5px; width: 100%;">Lưu Quyền</button>
                         </form>
                     </div>
+                    <div style="flex:1; min-width: 300px; background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                        <strong>3. Gán quyền Bỏ phiếu Bước 3 (Đảng ủy):</strong>
+                        <form id="addStep3VoterForm" class="add-form" style="margin-top: 10px;">
+                            <input type="email" id="newStep3VoterEmail" placeholder="Nhập email @dhhp.edu.vn" required style="width: 100%;">
+                            <button type="submit" class="btn-warning" style="margin-top: 5px; width: 100%; color: #000; font-weight: bold;">Thêm Người Bỏ Phiếu</button>
+                        </form>
+                        <div id="step3VoterList" style="margin-top: 15px; border-top: 1px solid #ddd; padding-top: 10px;">Đang tải...</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -108,6 +126,14 @@
             <div class="step-card">
                 <h3>Cập nhật điểm tự đánh giá cá nhân</h3>
                 <div id="step1Content">Đang kiểm tra thông tin...</div>
+                <div class="control-panel" id="step1MetaControls" style="display: none; margin-bottom: 15px;">
+                    <div class="meta-controls">
+                        <label><strong>Kỳ đánh giá: Quý</strong>
+                            <select id="selfQuarter"><option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option></select>
+                        </label>
+                        <label><strong>Năm</strong> <input type="number" id="selfYear" value="2026" style="width: 80px;"></label>
+                    </div>
+                </div>
                 <form id="selfScoreForm" class="hidden">
                     <input type="hidden" id="selfDeptId">
                     <input type="hidden" id="selfStaffId">
@@ -121,6 +147,16 @@
                         <input type="number" step="0.01" id="selfScoreInput" disabled style="font-weight: bold; color: #dc3545;"> 
                         <strong style="font-size: 1.2em;">/ <span id="maxScoreDisplay">100</span></strong>
                     </div>
+                    <div style="margin-top: 15px; background: #e9ecef; padding: 15px; border-radius: 5px;">
+                        <strong>Cá nhân tự nhận xếp loại:</strong>
+                        <select id="selfClassification" required style="padding: 8px; border-radius: 4px; border: 1px solid #ccc; margin-left: 10px; min-width: 250px;">
+                            <option value="">-- Chọn mức xếp loại --</option>
+                            <option value="HTXSNV">Hoàn thành Xuất sắc nhiệm vụ</option>
+                            <option value="HTTNV">Hoàn thành Tốt nhiệm vụ</option>
+                            <option value="HTNV">Hoàn thành Nhiệm vụ</option>
+                            <option value="KHTNV">Không hoàn thành Nhiệm vụ</option>
+                        </select>
+                    </div>
                     <div style="text-align: right; margin-top: 15px;">
                         <button type="submit" class="btn-primary" style="padding: 12px 30px; font-size: 16px;">LƯU ĐIỂM CỦA TÔI</button>
                     </div>
@@ -130,12 +166,12 @@
 
         <div id="step2" class="tab-content">
             <div class="step-card">
-                <h3>Cập nhật đề xuất của Tập thể Lãnh đạo đơn vị</h3>
+                <h3>Bình bầu tập thể & Đề xuất của Trưởng đơn vị</h3>
                 <p id="step2AuthMessage" style="color: #dc3545; font-weight: bold; margin-bottom: 15px;">Đang kiểm tra quyền hạn...</p>
                 <form id="deptProposalForm" class="hidden">
                     <table id="proposalTable" class="criteria-table">
                         <thead>
-                            <tr><th>TT</th><th>Họ tên</th><th>Điểm cá nhân tự chấm</th><th>Đề xuất của đơn vị</th></tr>
+                            <tr><th>TT</th><th>Họ tên</th><th>Điểm CN</th><th>Tự xếp loại</th><th>Bình bầu tập thể (Bạn đánh giá)</th><th>Đề xuất Trưởng đơn vị</th></tr>
                         </thead>
                         <tbody id="proposalTableBody"></tbody>
                     </table>
@@ -147,26 +183,43 @@
         </div>
 
         <div id="step3" class="tab-content">
-            <div class="control-panel">
-                <div class="meta-controls">
-                    <label><strong>Quý:</strong>
-                        <select id="voteQuarter"><option value="I">Quý I</option><option value="II">Quý II</option><option value="III">Quý III</option><option value="IV">Quý IV</option></select>
-                    </label>
-                    <label><strong>Năm:</strong>
-                        <input type="number" id="voteYear" value="2026" min="2020" max="2100">
-                    </label>
-                </div>
-                <div class="type-controls">
-                    <label for="voteType"><strong>Loại bỏ phiếu:</strong></label>
-                    <select id="voteType"><option value="xeploai">Bỏ phiếu Xếp loại</option><option value="tinnhiem">Bỏ phiếu Tín nhiệm</option></select>
-                </div>
+            <div class="admin-tabs" style="justify-content: center; margin-bottom: 10px;">
+                <button type="button" class="admin-tab-btn active" data-target="step3-vote-area">🗳️ Bỏ phiếu Đảng ủy</button>
+                <button type="button" class="admin-tab-btn" data-target="step3-results-area">📊 Xem Kết quả Tổng hợp</button>
             </div>
-            <form id="votingForm">
-                <div id="tableContainer"></div>
-                <div class="submit-area">
-                    <button type="submit" id="submitBtn" disabled>Gửi phiếu đánh giá cấp Đảng ủy</button>
+            <div id="step3-vote-area" class="admin-tab-content active" style="padding:0; border:none;">
+                <div class="control-panel">
+                    <div class="meta-controls">
+                        <label><strong>Quý:</strong>
+                            <select id="voteQuarter"><option value="I">Quý I</option><option value="II">Quý II</option><option value="III">Quý III</option><option value="IV">Quý IV</option></select>
+                        </label>
+                        <label><strong>Năm:</strong>
+                            <input type="number" id="voteYear" value="2026" min="2020" max="2100">
+                        </label>
+                    </div>
+                    <div class="type-controls">
+                        <label for="voteType"><strong>Loại bỏ phiếu:</strong></label>
+                        <select id="voteType"><option value="xeploai">Bỏ phiếu Xếp loại</option><option value="tinnhiem">Bỏ phiếu Tín nhiệm</option></select>
+                    </div>
                 </div>
-            </form>
+                <form id="votingForm">
+                    <div id="tableContainer"></div>
+                    <div class="submit-area" style="text-align: right; margin-top: 15px;">
+                        <button type="submit" id="submitBtn" disabled>Gửi phiếu đánh giá cấp Đảng ủy</button>
+                    </div>
+                </form>
+            </div>
+            <div id="step3-results-area" class="admin-tab-content" style="padding:0; border:none;">
+                <div class="control-panel">
+                    <div class="meta-controls">
+                        <label>Quý: <select id="resQuarter"><option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option></select></label>
+                        <label>Năm: <input type="number" id="resYear" value="2026" style="width: 80px;"></label>
+                        <button type="button" id="loadResultsBtn" class="btn-primary" style="margin-left:10px;">Tải Kết quả</button>
+                        <button type="button" id="exportResultsBtn" class="btn-success">Xuất Excel</button>
+                    </div>
+                </div>
+                <div id="resultsDisplayArea" style="background: white; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">Vui lòng chọn Quý/Năm và bấm Tải Kết quả.</div>
+            </div>
         </div>
 
         <div id="message" class="hidden"></div>
