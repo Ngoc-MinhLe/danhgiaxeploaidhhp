@@ -432,10 +432,15 @@ function renderStep3VotersAdmin() {
     if (listDiv) listDiv.innerHTML = html;
 }
 document.getElementById('addStep3VoterForm')?.addEventListener('submit', async (e) => {
-    e.preventDefault(); const email = document.getElementById('newStep3VoterEmail').value.trim();
+    e.preventDefault(); 
+    if (userRole !== 'superadmin' && userRole !== 'admin') return showMessage("Bạn không có quyền thực hiện hành động này.", true);
+    const email = document.getElementById('newStep3VoterEmail').value.trim();
     if (!step3Voters.includes(email)) { try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "Step3Voters"), { emails: [...step3Voters, email] }); document.getElementById('addStep3VoterForm').reset(); } catch(e) { handleFirebaseError(e); } }
 });
-window.removeStep3Voter = async function(email) { if(!confirm(`Xóa quyền của ${email}?`)) return; try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "Step3Voters"), { emails: step3Voters.filter(e => e !== email) }); } catch(e) { handleFirebaseError(e); } };
+window.removeStep3Voter = async function(email) { 
+    if (userRole !== 'superadmin' && userRole !== 'admin') return showMessage("Bạn không có quyền thực hiện hành động này.", true);
+    if(!confirm(`Xóa quyền của ${email}?`)) return; try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "Step3Voters"), { emails: step3Voters.filter(e => e !== email) }); } catch(e) { handleFirebaseError(e); } 
+};
 
 document.getElementById('addAdminForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -635,7 +640,7 @@ function renderVotingTable() {
     if(currentStaffData.length === 0) { tableContainer.innerHTML = "<p style='text-align:center;'>Chưa có dữ liệu.</p>"; document.getElementById('submitBtn').disabled = true; return; }
     
     const userEmail = auth.currentUser ? auth.currentUser.email : '';
-    const canVote = userRole === 'superadmin' || step3Voters.includes(userEmail);
+    const canVote = userRole === 'superadmin' || userRole === 'admin' || step3Voters.includes(userEmail);
     
     const voteType = voteTypeSelect.value;
     let html = `<table class="criteria-table"><thead><tr><th width="5%">TT</th><th width="20%">Họ tên</th><th width="8%">Điểm</th><th width="12%">Tự Nhận</th><th width="15%">Đề xuất ĐV</th>`;
