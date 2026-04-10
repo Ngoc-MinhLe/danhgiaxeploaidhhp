@@ -43,6 +43,8 @@ let currentStaffData = [];
 let userRole = 'guest'; 
 let isDhhpUser = false;
 let step3Voters = [];
+let currentUserVoteId = null;
+let currentUserVoteDetails = {};
 
 // DOM Elements
 const loginBtn = document.getElementById('loginBtn');
@@ -147,7 +149,7 @@ onSnapshot(doc(db, "DaiHocHaiPhong_Config", "Step3Voters"), (docSnap) => {
     if (docSnap.exists()) step3Voters = docSnap.data().emails || [];
     else step3Voters = [];
     renderStep3VotersAdmin();
-    renderVotingTable();
+    loadUserVoteStateAndRender();
 });
 
 function renderCriteriaAdmin() {
@@ -291,7 +293,7 @@ onSnapshot(collection(db, "DaiHocHaiPhong_NhanSu"), (snapshot) => {
 });
 
 function renderAllViews() {
-    updateDropdowns(); renderAdminStaffTable(); renderStep1(); renderStep2(); renderVotingTable(); 
+    updateDropdowns(); renderAdminStaffTable(); renderStep1(); renderStep2(); loadUserVoteStateAndRender(); 
 }
 
 // --- QUẢN TRỊ NHÂN SỰ ---
@@ -636,12 +638,42 @@ deptProposalForm.addEventListener('submit', async (e) => {
 // --- BƯỚC 3: BỎ PHIẾU ĐẢNG ỦY ---
 const tableContainer = document.getElementById('tableContainer');
 const voteTypeSelect = document.getElementById('voteType');
+
+async function loadUserVoteStateAndRender() {
+    const q = document.getElementById('voteQuarter').value;
+    const y = document.getElementById('voteYear').value;
+    const vType = voteTypeSelect.value;
+    const voterEmail = auth.currentUser ? (auth.currentUser.email || auth.currentUser.displayName) : "Khách ẩn danh";
+
+    currentUserVoteId = null;
+    currentUserVoteDetails = {};
+
+    if(auth.currentUser) {
+        try {
+            const qSnap = await getDocs(query(collection(db, "DaiHocHaiPhong_BoPhieu"), where("quy", "==", q), where("nam", "==", y), where("voteType", "==", vType), where("voter", "==", voterEmail)));
+            if(!qSnap.empty) {
+                const docSnap = qSnap.docs[0];
+                currentUserVoteId = docSnap.id;
+                const data = docSnap.data();
+                (data.details || []).forEach(d => { currentUserVoteDetails[d.staffId] = d.vote; });
+            }
+        } catch(e) { console.error("Error loading vote state:", e); }
+    }
+    renderVotingTable();
+}
+
 function renderVotingTable() {
-    if(currentStaffData.length === 0) { tableContainer.innerHTML = "<p style='text-align:center;'>Chưa có dữ liệu.</p>"; document.getElementById('submitBtn').disabled = true; return; }
+    if(currentStaffData.length === 0) { tableContainer.innerHTML = "<p style='text-align:center;'>Chưa có dữ liệu.</p>"; document.getElementById('submitBtn').disabled = true; if(document.getElementById('votingStatusMsg')) document.getElementById('votingStatusMsg').innerHTML = ''; return; }
     
     const userEmail = auth.currentUser ? auth.currentUser.email : '';
     const canVote = userRole === 'superadmin' || userRole === 'admin' || step3Voters.includes(userEmail);
     
+    const statusMsg = document.getElementById('votingStatusMsg');
+    if(statusMsg) {
+        if (currentUserVoteId) { statusMsg.innerHTML = `<div class="success" style="padding: 10px; border-radius: 4px; margin-bottom: 10px; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;">Bạn đã nộp phiếu cho kỳ này. Bạn có thể thay đổi lựa chọn bên dưới và bấm Cập nhật để sửa phiếu.</div>`; } 
+        else { statusMsg.innerHTML = ''; }
+    }
+
     const voteType = voteTypeSelect.value;
     let html = `<table class="criteria-table"><thead><tr><th width="5%">TT</th><th width="20%">Họ tên</th><th width="8%">Điểm</th><th width="12%">Tự Nhận</th><th width="15%">Đề xuất ĐV</th>`;
     if (voteType === 'xeploai') html += `<th width="13%">HTXSNV</th><th width="13%">HTTNV</th><th width="13%">HTNV</th>`;
@@ -655,9 +687,10 @@ function renderVotingTable() {
                 <td><strong style="color:red">${staff.score !== undefined && staff.score !== "" ? staff.score : ''}</strong></td>
                 <td><span style="color:#17a2b8; font-weight:bold;">${staff.selfClassification || ''}</span></td>
                 <td style="font-weight:bold; color:#0056b3">${staff.proposed || ''}</td>`;
+            const myVote = currentUserVoteDetails[staff.id] || '';
             if (canVote) {
-                if (voteType === 'xeploai') { html += `<td><input type="radio" name="vote_${staff.id}" value="HTXSNV" required></td><td><input type="radio" name="vote_${staff.id}" value="HTTNV"></td><td><input type="radio" name="vote_${staff.id}" value="HTNV"></td>`; } 
-                else { html += `<td><input type="radio" name="vote_${staff.id}" value="Tín nhiệm" required></td><td><input type="radio" name="vote_${staff.id}" value="Không tín nhiệm"></td>`; }
+                if (voteType === 'xeploai') { html += `<td><input type="radio" name="vote_${staff.id}" value="HTXSNV" ${myVote==='HTXSNV'?'checked':''} required></td><td><input type="radio" name="vote_${staff.id}" value="HTTNV" ${myVote==='HTTNV'?'checked':''}></td><td><input type="radio" name="vote_${staff.id}" value="HTNV" ${myVote==='HTNV'?'checked':''}></td>`; } 
+                else { html += `<td><input type="radio" name="vote_${staff.id}" value="Tín nhiệm" ${myVote==='Tín nhiệm'?'checked':''} required></td><td><input type="radio" name="vote_${staff.id}" value="Không tín nhiệm" ${myVote==='Không tín nhiệm'?'checked':''}></td>`; }
             } else {
                 if (voteType === 'xeploai') { html += `<td colspan="3"><span style="color:#ccc">Không có quyền</span></td>`; } 
                 else { html += `<td colspan="2"><span style="color:#ccc">Không có quyền</span></td>`; }
@@ -669,25 +702,45 @@ function renderVotingTable() {
     tableContainer.innerHTML = html;
     if(canVote) {
         document.getElementById('submitBtn').disabled = false;
-        document.getElementById('submitBtn').innerText = "Gửi phiếu đánh giá cấp Đảng ủy";
+        document.getElementById('submitBtn').innerText = currentUserVoteId ? "Cập nhật phiếu đánh giá" : "Gửi phiếu đánh giá cấp Đảng ủy";
     } else {
         document.getElementById('submitBtn').disabled = true;
         document.getElementById('submitBtn').innerText = "Tài khoản của bạn không có quyền bỏ phiếu";
     }
 }
-voteTypeSelect.addEventListener('change', renderVotingTable);
+voteTypeSelect.addEventListener('change', loadUserVoteStateAndRender);
+document.getElementById('voteQuarter').addEventListener('change', loadUserVoteStateAndRender);
+document.getElementById('voteYear').addEventListener('change', loadUserVoteStateAndRender);
 
 document.getElementById('votingForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = true; submitBtn.innerText = "Đang gửi...";
-    const formData = new FormData(document.getElementById('votingForm'));
-    const results = [];
-    currentStaffData.forEach(dept => { (dept.members || []).forEach(staff => { const voteValue = formData.get(`vote_${staff.id}`); if (voteValue) results.push({ staffId: staff.id, staffName: staff.name, department: dept.department, vote: voteValue }); }); });
-    const voteRecord = { quy: document.getElementById('voteQuarter').value, nam: document.getElementById('voteYear').value, voteType: voteTypeSelect.value, timestamp: serverTimestamp(), voter: auth.currentUser ? (auth.currentUser.email || auth.currentUser.displayName) : "Khách ẩn danh", project: "DaiHocHaiPhong_BoPhieu", details: results };
-    try { await addDoc(collection(db, "DaiHocHaiPhong_BoPhieu"), voteRecord); showMessage(`Đã gửi phiếu thành công!`); document.getElementById('votingForm').reset(); } 
+    
+    const q = document.getElementById('voteQuarter').value;
+    const y = document.getElementById('voteYear').value;
+    const vType = voteTypeSelect.value;
+    const voterEmail = auth.currentUser ? (auth.currentUser.email || auth.currentUser.displayName) : "Khách ẩn danh";
+
+    try {
+        const formData = new FormData(document.getElementById('votingForm'));
+        const results = [];
+        currentStaffData.forEach(dept => { (dept.members || []).forEach(staff => { const voteValue = formData.get(`vote_${staff.id}`); if (voteValue) results.push({ staffId: staff.id, staffName: staff.name, department: dept.department, vote: voteValue }); }); });
+        const voteRecord = { quy: q, nam: y, voteType: vType, timestamp: serverTimestamp(), voter: voterEmail, project: "DaiHocHaiPhong_BoPhieu", details: results };
+        
+        if (currentUserVoteId) {
+            await updateDoc(doc(db, "DaiHocHaiPhong_BoPhieu", currentUserVoteId), voteRecord);
+            showMessage(`Đã cập nhật phiếu thành công!`);
+        } else {
+            const docRef = await addDoc(collection(db, "DaiHocHaiPhong_BoPhieu"), voteRecord);
+            currentUserVoteId = docRef.id;
+            showMessage(`Đã gửi phiếu thành công!`);
+        }
+        results.forEach(r => currentUserVoteDetails[r.staffId] = r.vote);
+        renderVotingTable();
+    } 
     catch (error) { handleFirebaseError(error); } 
-    finally { submitBtn.disabled = false; submitBtn.innerText = "Gửi phiếu đánh giá"; }
+    finally { submitBtn.disabled = false; if(submitBtn) submitBtn.innerText = currentUserVoteId ? "Cập nhật phiếu đánh giá" : "Gửi phiếu đánh giá cấp Đảng ủy"; }
 });
 
 // --- XEM VÀ XUẤT KẾT QUẢ BƯỚC 3 ---
@@ -724,6 +777,29 @@ document.getElementById('loadResultsBtn')?.addEventListener('click', async () =>
             });
         });
         html += `</tbody></table>`;
+
+        if (userRole === 'admin' || userRole === 'superadmin') {
+            html += `<h4 style="margin-top: 30px; color: #0056b3; border-bottom: 2px solid #ccc; padding-bottom: 10px;">Lịch sử Bỏ phiếu Chi tiết (Chỉ Admin mới thấy)</h4>`;
+            if (totalVotes === 0) {
+                html += `<p>Chưa có dữ liệu bỏ phiếu chi tiết.</p>`;
+            } else {
+                html += `<table class="criteria-table" style="font-size: 13px; margin-top:15px;">
+                    <thead><tr><th width="15%">Thời gian nộp</th><th width="20%">Người bỏ phiếu</th><th width="15%">Loại phiếu</th><th>Chi tiết lựa chọn</th></tr></thead><tbody>`;
+                qSnap.forEach(doc => {
+                    const data = doc.data();
+                    const timeStr = data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().toLocaleString('vi-VN') : 'Không rõ';
+                    let detailsStr = `<div style="max-height: 120px; overflow-y: auto; text-align: left; padding: 5px;">`;
+                    (data.details || []).forEach(d => {
+                        let color = d.vote.includes("Không") ? "red" : (d.vote.includes("Xuất sắc") || d.vote === "Tín nhiệm" ? "green" : "black");
+                        detailsStr += `<div><b>${d.staffName}</b>: <span style="color:${color}">${d.vote}</span></div>`;
+                    });
+                    detailsStr += `</div>`;
+                    html += `<tr><td>${timeStr}</td><td><strong>${data.voter}</strong></td><td>${data.voteType === 'xeploai' ? 'Xếp loại' : 'Tín nhiệm'}</td><td>${detailsStr}</td></tr>`;
+                });
+                html += `</tbody></table>`;
+            }
+        }
+
         resArea.innerHTML = html;
     } catch(e) { handleFirebaseError(e); }
 });

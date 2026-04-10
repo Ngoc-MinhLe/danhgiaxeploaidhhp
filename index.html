@@ -130,7 +130,7 @@
                 <div class="control-panel" id="step1MetaControls" style="display: none; margin-bottom: 15px;">
                     <div class="meta-controls">
                         <label><strong>Kỳ đánh giá: Quý</strong>
-                            <select id="selfQuarter"><option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option></select>
+                            <select id="selfQuarter"><option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option><option value="Cả năm">Cả năm</option></select>
                         </label>
                         <label><strong>Năm</strong> <input type="number" id="selfYear" value="2026" style="width: 80px;"></label>
                     </div>
@@ -192,7 +192,7 @@
                 <div class="control-panel">
                     <div class="meta-controls">
                         <label><strong>Quý:</strong>
-                            <select id="voteQuarter"><option value="I">Quý I</option><option value="II">Quý II</option><option value="III">Quý III</option><option value="IV">Quý IV</option></select>
+                            <select id="voteQuarter"><option value="I">Quý I</option><option value="II">Quý II</option><option value="III">Quý III</option><option value="IV">Quý IV</option><option value="Cả năm">Cả năm</option></select>
                         </label>
                         <label><strong>Năm:</strong>
                             <input type="number" id="voteYear" value="2026" min="2020" max="2100">
@@ -204,6 +204,7 @@
                     </div>
                 </div>
                 <form id="votingForm">
+                    <div id="votingStatusMsg"></div>
                     <div id="tableContainer"></div>
                     <div class="submit-area" style="text-align: right; margin-top: 15px;">
                         <button type="submit" id="submitBtn" disabled>Gửi phiếu đánh giá cấp Đảng ủy</button>
@@ -213,7 +214,7 @@
             <div id="step3-results-area" class="admin-tab-content" style="padding:0; border:none;">
                 <div class="control-panel">
                     <div class="meta-controls">
-                        <label>Quý: <select id="resQuarter"><option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option></select></label>
+                        <label>Quý: <select id="resQuarter"><option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option><option value="Cả năm">Cả năm</option></select></label>
                         <label>Năm: <input type="number" id="resYear" value="2026" style="width: 80px;"></label>
                         <button type="button" id="loadResultsBtn" class="btn-primary" style="margin-left:10px;">Tải Kết quả</button>
                         <button type="button" id="exportResultsBtn" class="btn-success">Xuất Excel</button>
