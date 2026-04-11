@@ -470,6 +470,26 @@ document.getElementById('assignHeadForm').addEventListener('submit', async (e) =
 });
 
 // --- BƯỚC 1: CÁ NHÂN TỰ ĐÁNH GIÁ (HIỂN THỊ THEO NHÓM 3 CẤP) ---
+function getPeriodData(member, periodKey) {
+    if (member.assessments && member.assessments[periodKey]) return member.assessments[periodKey];
+    // Đảm bảo không mất dữ liệu cũ đã chấm trước khi nâng cấp
+    if (member.selfQuarter === periodKey.split('_')[0] && String(member.selfYear) === String(periodKey.split('_')[1])) {
+        return {
+            score: member.score,
+            criteriaScores: member.criteriaScores,
+            selfClassification: member.selfClassification,
+            disabledGroups: member.disabledGroups,
+            peerVotes: member.peerVotes,
+            proposed: member.proposed
+        };
+    }
+    return {};
+}
+document.getElementById('selfQuarter')?.addEventListener('change', renderStep1);
+document.getElementById('selfYear')?.addEventListener('change', renderStep1);
+document.getElementById('step2Quarter')?.addEventListener('change', renderStep2);
+document.getElementById('step2Year')?.addEventListener('change', renderStep2);
+
 function renderStep1() {
     const step1Content = document.getElementById('step1Content');
     const selfScoreForm = document.getElementById('selfScoreForm');
@@ -497,13 +517,18 @@ function renderStep1() {
     document.getElementById('selfStaffId').value = myProfile.id;
     document.getElementById('selfDeptName').value = myDept.department;
     document.getElementById('selfStaffName').value = myProfile.name;
-    if(myProfile.selfQuarter) document.getElementById('selfQuarter').value = myProfile.selfQuarter;
-    if(myProfile.selfYear) document.getElementById('selfYear').value = myProfile.selfYear;
-    if(myProfile.selfClassification) document.getElementById('selfClassification').value = myProfile.selfClassification;
+    
+    const q = document.getElementById('selfQuarter').value;
+    const y = document.getElementById('selfYear').value;
+    const periodKey = `${q}_${y}`;
+    const periodData = getPeriodData(myProfile, periodKey);
+
+    if(periodData.selfClassification) document.getElementById('selfClassification').value = periodData.selfClassification;
+    else document.getElementById('selfClassification').value = "";
     
     let criteriaHtml = `<table class="criteria-table"><thead><tr><th>Nội dung tiêu chí đánh giá</th><th width="15%">Điểm tối đa</th><th width="15%">Điểm tự chấm</th></tr></thead><tbody>`;
-    const savedScores = myProfile.criteriaScores || {}; 
-    const disabledGroups = myProfile.disabledGroups || [];
+    const savedScores = periodData.criteriaScores || {}; 
+    const disabledGroups = periodData.disabledGroups || [];
     
     if(CRITERIA_GROUPS.length === 0) criteriaHtml += `<tr><td colspan="3">Chưa có cấu hình tiêu chí. Vui lòng báo Quản trị viên.</td></tr>`;
     
@@ -583,9 +608,25 @@ document.getElementById('selfScoreForm').addEventListener('submit', async (e) =>
     const disabledGroups = [];
     document.querySelectorAll('.group-toggle:not(:checked)').forEach(t => disabledGroups.push(t.dataset.gid));
 
+    const periodKey = `${selfQuarter}_${selfYear}`;
+
     const deptDoc = currentStaffData.find(d => d.id === deptId);
     if(!deptDoc || !deptDoc.members) return;
-    const updatedMembers = deptDoc.members.map(m => m.id === staffId ? { ...m, score: totalScore, criteriaScores: criteriaScores, selfQuarter, selfYear, selfClassification, disabledGroups } : m);
+    const updatedMembers = deptDoc.members.map(m => {
+        if (m.id === staffId) {
+            const assessments = m.assessments || {};
+            const periodData = getPeriodData(m, periodKey);
+            assessments[periodKey] = {
+                ...periodData,
+                score: totalScore,
+                criteriaScores: criteriaScores,
+                selfClassification: selfClassification,
+                disabledGroups: disabledGroups
+            };
+            return { ...m, assessments };
+        }
+        return m;
+    });
     
     try { await updateDoc(doc(db, "DaiHocHaiPhong_NhanSu", deptId), { members: updatedMembers }); showMessage("Đã lưu bảng điểm tự đánh giá!"); } 
     catch(e) { handleFirebaseError(e); }
@@ -618,33 +659,29 @@ function renderStep2() {
     step2AuthMessage.style.color = "#28a745"; deptProposalForm.classList.remove('hidden');
     if(step2Controls) step2Controls.style.display = 'flex';
 
-    let foundQ = null, foundY = null;
-    for (const d of involvedDepts) {
-        const m = (d.members || []).find(x => x.propQuarter && x.propYear);
-        if (m) { foundQ = m.propQuarter; foundY = m.propYear; break; }
-    }
-    if (foundQ && document.getElementById('step2Quarter')) document.getElementById('step2Quarter').value = foundQ;
-    if (foundY && document.getElementById('step2Year')) document.getElementById('step2Year').value = foundY;
+    const step2Quarter = document.getElementById('step2Quarter').value;
+    const step2Year = document.getElementById('step2Year').value;
+    const periodKey = `${step2Quarter}_${step2Year}`;
 
     let html = '';
     involvedDepts.forEach(dept => {
         const isHead = dept.headEmail === userEmail;
         html += `<tr class="dept-row"><td colspan="6">Khu vực: ${dept.department} ${isHead ? '(Bạn là Trưởng đơn vị)' : '(Thành viên)'}</td></tr>`;
         (dept.members || []).forEach((m, index) => {
-            const myPeerVote = (m.peerVotes || {})[userEmail] || '';
-            const selfPeriod = m.selfQuarter && m.selfYear ? `<br><small style="color:#666; font-weight:normal;">(Kỳ: ${m.selfQuarter}/${m.selfYear})</small>` : '';
-            const selfClass = m.selfClassification ? `<span style="color:#17a2b8; font-weight:bold">${m.selfClassification}</span>${selfPeriod}` : 'Chưa chọn';
+            const periodData = getPeriodData(m, periodKey);
+            const myPeerVote = (periodData.peerVotes || {})[userEmail] || '';
+            const selfClass = periodData.selfClassification ? `<span style="color:#17a2b8; font-weight:bold">${periodData.selfClassification}</span>` : '<span style="color:#999; font-style:italic">Chưa tự chấm</span>';
             
-            const scoreVal = parseFloat(m.score);
+            const scoreVal = parseFloat(periodData.score);
             const canBeXuatsac = !isNaN(scoreVal) && scoreVal >= 90;
             const disableXuatSacAttr = canBeXuatsac ? '' : 'disabled';
             const xuatSacText = canBeXuatsac ? 'Hoàn thành Xuất sắc' : 'HT Xuất sắc (Cần >= 90đ)';
             const peerXuatSacSel = (myPeerVote === 'HTXSNV' && canBeXuatsac) ? 'selected' : '';
-            const propXuatSacSel = (m.proposed === 'HTXSNV' && canBeXuatsac) ? 'selected' : '';
+            const propXuatSacSel = (periodData.proposed === 'HTXSNV' && canBeXuatsac) ? 'selected' : '';
 
             html += `<tr>
                 <td>${index + 1}</td><td class="text-left">${m.name}</td>
-                <td><strong style="color:red; font-size:1.1em">${m.score !== undefined && m.score !== "" ? m.score : 'Chưa chấm'}</strong></td>
+                <td><strong style="color:red; font-size:1.1em">${periodData.score !== undefined && periodData.score !== "" ? periodData.score : '—'}</strong></td>
                 <td>${selfClass}</td>
                 <td>
                     <select name="peer_${dept.id}_${m.id}" style="padding: 5px; width: 100%;">
@@ -676,22 +713,28 @@ deptProposalForm.addEventListener('submit', async (e) => {
     const formData = new FormData(deptProposalForm);
     const propQuarter = document.getElementById('step2Quarter') ? document.getElementById('step2Quarter').value : '';
     const propYear = document.getElementById('step2Year') ? document.getElementById('step2Year').value : '';
+    const periodKey = `${propQuarter}_${propYear}`;
+
     try {
         for (const dept of involvedDepts) {
             const isHead = dept.headEmail === userEmail;
             const updatedMembers = (dept.members || []).map(m => {
                 const peerVal = formData.get(`peer_${dept.id}_${m.id}`);
                 const propValue = formData.get(`prop_${dept.id}_${m.id}`);
-                let newPeerVotes = { ...(m.peerVotes || {}) };
+                
+                const assessments = m.assessments || {};
+                const periodData = getPeriodData(m, periodKey);
+                
+                let newPeerVotes = { ...(periodData.peerVotes || {}) };
                 if (peerVal) newPeerVotes[userEmail] = peerVal; else delete newPeerVotes[userEmail];
                 
-                let updatedData = { ...m, peerVotes: newPeerVotes };
+                let updatedPeriodData = { ...periodData, peerVotes: newPeerVotes };
                 if (isHead) {
-                    updatedData.proposed = propValue || m.proposed || "";
-                    if (propQuarter) updatedData.propQuarter = propQuarter;
-                    if (propYear) updatedData.propYear = propYear;
+                    updatedPeriodData.proposed = propValue || periodData.proposed || "";
                 }
-                return updatedData;
+                
+                assessments[periodKey] = updatedPeriodData;
+                return { ...m, assessments };
             });
             await updateDoc(doc(db, "DaiHocHaiPhong_NhanSu", dept.id), { members: updatedMembers });
         }
@@ -739,6 +782,10 @@ function renderVotingTable() {
     }
 
     const voteType = voteTypeSelect.value;
+    const q = document.getElementById('voteQuarter').value;
+    const y = document.getElementById('voteYear').value;
+    const periodKey = `${q}_${y}`;
+
     let html = `<table class="criteria-table"><thead><tr><th width="5%">TT</th><th width="20%">Họ tên</th><th width="8%">Điểm</th><th width="15%">Tự Nhận</th><th width="15%">Đề xuất ĐV</th>`;
     if (voteType === 'xeploai') html += `<th width="12%">HTTNV</th><th width="12%">HTNV</th><th width="13%">KHTNV</th>`;
     else html += `<th width="20%">Tín nhiệm</th><th width="20%">Không tín nhiệm</th>`;
@@ -747,10 +794,11 @@ function renderVotingTable() {
     currentStaffData.forEach(dept => {
         html += `<tr class="dept-row"><td colspan="5">${dept.department}</td>${voteType === 'xeploai' ? '<td colspan="3"></td>' : '<td colspan="2"></td>'}</tr>`;
         (dept.members || []).forEach((staff, index) => {
+            const periodData = getPeriodData(staff, periodKey);
             html += `<tr><td>${index + 1}</td><td class="text-left" style="font-weight:bold;">${staff.name}</td>
-                <td><strong style="color:red">${staff.score !== undefined && staff.score !== "" ? staff.score : ''}</strong></td>
-                <td><span style="color:#17a2b8; font-weight:bold;">${staff.selfClassification || ''}</span></td>
-                <td style="font-weight:bold; color:#0056b3">${staff.proposed || ''}</td>`;
+                <td><strong style="color:red">${periodData.score !== undefined && periodData.score !== "" ? periodData.score : ''}</strong></td>
+                <td><span style="color:#17a2b8; font-weight:bold;">${periodData.selfClassification || ''}</span></td>
+                <td style="font-weight:bold; color:#0056b3">${periodData.proposed || ''}</td>`;
             const myVote = currentUserVoteDetails[staff.id] || '';
             if (canVote) {
                 if (voteType === 'xeploai') { html += `<td><input type="radio" name="vote_${staff.id}" value="HTTNV" ${myVote==='HTTNV'?'checked':''} required></td><td><input type="radio" name="vote_${staff.id}" value="HTNV" ${myVote==='HTNV'?'checked':''}></td><td><input type="radio" name="vote_${staff.id}" value="KHTNV" ${myVote==='KHTNV'?'checked':''}></td>`; } 
