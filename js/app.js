@@ -595,22 +595,36 @@ document.getElementById('selfScoreForm').addEventListener('submit', async (e) =>
 const deptProposalForm = document.getElementById('deptProposalForm');
 const proposalTableBody = document.getElementById('proposalTableBody');
 const step2AuthMessage = document.getElementById('step2AuthMessage');
+const step2Controls = document.getElementById('step2Controls');
 
 function renderStep2() {
     if (!auth.currentUser || !isDhhpUser) {
         step2AuthMessage.innerText = "Đăng nhập bằng tài khoản @dhhp.edu.vn để tham gia bình bầu.";
-        deptProposalForm.classList.add('hidden'); return;
+        deptProposalForm.classList.add('hidden');
+        if(step2Controls) step2Controls.style.display = 'none';
+        return;
     }
     const userEmail = auth.currentUser.email;
     const involvedDepts = currentStaffData.filter(d => d.headEmail === userEmail || (d.members && d.members.some(m => m.email === userEmail)));
     
     if (involvedDepts.length === 0) {
         step2AuthMessage.innerText = "Tài khoản của bạn CHƯA thuộc phòng ban nào để bình bầu.";
-        step2AuthMessage.style.color = "#dc3545"; deptProposalForm.classList.add('hidden'); return;
+        step2AuthMessage.style.color = "#dc3545"; deptProposalForm.classList.add('hidden');
+        if(step2Controls) step2Controls.style.display = 'none';
+        return;
     }
 
     step2AuthMessage.innerText = `Khu vực Bình bầu của bạn`;
     step2AuthMessage.style.color = "#28a745"; deptProposalForm.classList.remove('hidden');
+    if(step2Controls) step2Controls.style.display = 'flex';
+
+    let foundQ = null, foundY = null;
+    for (const d of involvedDepts) {
+        const m = (d.members || []).find(x => x.propQuarter && x.propYear);
+        if (m) { foundQ = m.propQuarter; foundY = m.propYear; break; }
+    }
+    if (foundQ && document.getElementById('step2Quarter')) document.getElementById('step2Quarter').value = foundQ;
+    if (foundY && document.getElementById('step2Year')) document.getElementById('step2Year').value = foundY;
 
     let html = '';
     involvedDepts.forEach(dept => {
@@ -618,7 +632,16 @@ function renderStep2() {
         html += `<tr class="dept-row"><td colspan="6">Khu vực: ${dept.department} ${isHead ? '(Bạn là Trưởng đơn vị)' : '(Thành viên)'}</td></tr>`;
         (dept.members || []).forEach((m, index) => {
             const myPeerVote = (m.peerVotes || {})[userEmail] || '';
-            const selfClass = m.selfClassification ? `<span style="color:#17a2b8; font-weight:bold">${m.selfClassification}</span>` : 'Chưa chọn';
+            const selfPeriod = m.selfQuarter && m.selfYear ? `<br><small style="color:#666; font-weight:normal;">(Kỳ: ${m.selfQuarter}/${m.selfYear})</small>` : '';
+            const selfClass = m.selfClassification ? `<span style="color:#17a2b8; font-weight:bold">${m.selfClassification}</span>${selfPeriod}` : 'Chưa chọn';
+            
+            const scoreVal = parseFloat(m.score);
+            const canBeXuatsac = !isNaN(scoreVal) && scoreVal >= 90;
+            const disableXuatSacAttr = canBeXuatsac ? '' : 'disabled';
+            const xuatSacText = canBeXuatsac ? 'Hoàn thành Xuất sắc' : 'HT Xuất sắc (Cần >= 90đ)';
+            const peerXuatSacSel = (myPeerVote === 'HTXSNV' && canBeXuatsac) ? 'selected' : '';
+            const propXuatSacSel = (m.proposed === 'HTXSNV' && canBeXuatsac) ? 'selected' : '';
+
             html += `<tr>
                 <td>${index + 1}</td><td class="text-left">${m.name}</td>
                 <td><strong style="color:red; font-size:1.1em">${m.score !== undefined && m.score !== "" ? m.score : 'Chưa chấm'}</strong></td>
@@ -626,7 +649,7 @@ function renderStep2() {
                 <td>
                     <select name="peer_${dept.id}_${m.id}" style="padding: 5px; width: 100%;">
                         <option value="">-- Bình bầu --</option>
-                        <option value="HTXSNV" ${myPeerVote === 'HTXSNV' ? 'selected' : ''}>Hoàn thành Xuất sắc</option>
+                        <option value="HTXSNV" ${peerXuatSacSel} ${disableXuatSacAttr}>${xuatSacText}</option>
                         <option value="HTTNV" ${myPeerVote === 'HTTNV' ? 'selected' : ''}>Hoàn thành Tốt</option>
                         <option value="HTNV" ${myPeerVote === 'HTNV' ? 'selected' : ''}>Hoàn thành NV</option>
                         <option value="KHTNV" ${myPeerVote === 'KHTNV' ? 'selected' : ''}>Không HTNV</option>
@@ -635,7 +658,7 @@ function renderStep2() {
                 <td>
                     <select name="prop_${dept.id}_${m.id}" style="padding: 5px; width: 100%; background: ${isHead ? '#fff' : '#e9ecef'};" ${isHead ? '' : 'disabled'}>
                         <option value="">-- Trưởng ĐV chốt --</option>
-                        <option value="HTXSNV" ${m.proposed === 'HTXSNV' ? 'selected' : ''}>Hoàn thành Xuất sắc</option>
+                        <option value="HTXSNV" ${propXuatSacSel} ${disableXuatSacAttr}>${xuatSacText}</option>
                         <option value="HTTNV" ${m.proposed === 'HTTNV' ? 'selected' : ''}>Hoàn thành Tốt</option>
                         <option value="HTNV" ${m.proposed === 'HTNV' ? 'selected' : ''}>Hoàn thành NV</option>
                         <option value="KHTNV" ${m.proposed === 'KHTNV' ? 'selected' : ''}>Không HTNV</option>
@@ -651,6 +674,8 @@ deptProposalForm.addEventListener('submit', async (e) => {
     const userEmail = auth.currentUser.email; 
     const involvedDepts = currentStaffData.filter(d => d.headEmail === userEmail || (d.members && d.members.some(m => m.email === userEmail)));
     const formData = new FormData(deptProposalForm);
+    const propQuarter = document.getElementById('step2Quarter') ? document.getElementById('step2Quarter').value : '';
+    const propYear = document.getElementById('step2Year') ? document.getElementById('step2Year').value : '';
     try {
         for (const dept of involvedDepts) {
             const isHead = dept.headEmail === userEmail;
@@ -659,7 +684,14 @@ deptProposalForm.addEventListener('submit', async (e) => {
                 const propValue = formData.get(`prop_${dept.id}_${m.id}`);
                 let newPeerVotes = { ...(m.peerVotes || {}) };
                 if (peerVal) newPeerVotes[userEmail] = peerVal; else delete newPeerVotes[userEmail];
-                return { ...m, peerVotes: newPeerVotes, proposed: isHead ? (propValue || m.proposed || "") : (m.proposed || "") };
+                
+                let updatedData = { ...m, peerVotes: newPeerVotes };
+                if (isHead) {
+                    updatedData.proposed = propValue || m.proposed || "";
+                    if (propQuarter) updatedData.propQuarter = propQuarter;
+                    if (propYear) updatedData.propYear = propYear;
+                }
+                return updatedData;
             });
             await updateDoc(doc(db, "DaiHocHaiPhong_NhanSu", dept.id), { members: updatedMembers });
         }
