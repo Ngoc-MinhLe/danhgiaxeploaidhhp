@@ -591,10 +591,46 @@ function calculateTotalScore() {
     });
     document.getElementById('selfScoreInput').value = total;
     if(document.getElementById('maxScoreDisplay')) document.getElementById('maxScoreDisplay').innerText = activeMax;
+
+        const scoreWarning = document.getElementById('scoreWarning');
+        if (scoreWarning) {
+            if (activeMax > 100) {
+                scoreWarning.innerHTML = `⚠️ Vui lòng <strong>bỏ tích</strong> bớt các Nhóm đối tượng không thuộc phạm vi đánh giá để Điểm tối đa không vượt quá 100đ!`;
+                scoreWarning.classList.remove('hidden');
+            } else if (activeMax < 100 && activeMax > 0) {
+                scoreWarning.innerHTML = `⚠️ Điểm tối đa đang dưới 100đ. Vui lòng kiểm tra lại.`;
+                scoreWarning.classList.remove('hidden');
+            } else {
+                scoreWarning.classList.add('hidden');
+            }
+        }
+
+        const selfClassSelect = document.getElementById('selfClassification');
+        const classWarning = document.getElementById('classificationWarning');
+        if (selfClassSelect) {
+            const optionXuatSac = selfClassSelect.querySelector('option[value="HTXSNV"]');
+            if (total < 90) {
+                if(optionXuatSac) optionXuatSac.disabled = true;
+                if(selfClassSelect.value === 'HTXSNV') selfClassSelect.value = '';
+                if(classWarning) {
+                    classWarning.innerText = "💡 Cảnh báo nhẹ: Điểm tự chấm của bạn dưới 90 điểm, chưa đủ điều kiện để tự nhận Xếp loại Xuất sắc.";
+                    classWarning.classList.remove('hidden');
+                }
+            } else {
+                if(optionXuatSac) optionXuatSac.disabled = false;
+                if(classWarning) classWarning.classList.add('hidden');
+            }
+        }
 }
 
 document.getElementById('selfScoreForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const activeMax = parseFloat(document.getElementById('maxScoreDisplay').innerText) || 0;
+    if (activeMax > 100) {
+        alert("Vui lòng bỏ tích bớt Nhóm đối tượng để Điểm tối đa không vượt quá 100đ trước khi lưu!");
+        return;
+    }
+
     const deptId = document.getElementById('selfDeptId').value;
     const staffId = document.getElementById('selfStaffId').value;
     const totalScore = parseFloat(document.getElementById('selfScoreInput').value);
@@ -917,11 +953,22 @@ function renderStep4Table() {
     let html = `<table class="criteria-table"><thead><tr><th width="10%">TT</th><th width="30%">Họ tên</th><th width="40%">Đơn vị</th><th width="20%">Bầu Xuất Sắc</th></tr></thead><tbody>`;
     step4EligibleStaff.sort((a,b) => a.dept.localeCompare(b.dept) || a.name.localeCompare(b.name));
     
+    const q = document.getElementById('step4Quarter').value; 
+    const y = document.getElementById('step4Year').value;
+    const periodKey = `${q}_${y}`;
+
     step4EligibleStaff.forEach((staff, index) => {
+        let staffScore = 0;
+        for (const d of currentStaffData) {
+            const m = (d.members || []).find(x => x.id === staff.id);
+            if (m) { staffScore = parseFloat(getPeriodData(m, periodKey).score) || 0; break; }
+        }
+        const canBeXuatsac = staffScore >= 90;
+
         const isChecked = currentStep4VoteDetails[staff.id] === 'HTXSNV';
         html += `<tr>
-            <td>${index + 1}</td><td class="text-left" style="font-weight:bold;">${staff.name}</td><td>${staff.dept}</td>
-            <td><input type="checkbox" class="step4-checkbox" name="vote_s4_${staff.id}" value="HTXSNV" ${isChecked ? 'checked' : ''} style="transform: scale(1.5);"></td>
+            <td>${index + 1}</td><td class="text-left" style="font-weight:bold;">${staff.name} ${!canBeXuatsac ? '<br><small style="color:#dc3545; font-weight:normal;">(Điểm < 90: Không đủ điều kiện)</small>' : ''}</td><td>${staff.dept}</td>
+            <td><input type="checkbox" class="step4-checkbox" name="vote_s4_${staff.id}" value="HTXSNV" ${isChecked ? 'checked' : ''} ${!canBeXuatsac ? 'disabled' : ''} style="transform: scale(1.5);"></td>
         </tr>`;
     });
     html += `</tbody></table>`; tableContainer.innerHTML = html;

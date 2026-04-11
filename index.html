@@ -143,6 +143,7 @@
                         <strong style="font-size: 1.2em;">TỔNG ĐIỂM TỰ CHẤM:</strong>
                         <input type="number" step="0.01" id="selfScoreInput" disabled style="font-weight: bold; color: #dc3545;"> 
                         <strong style="font-size: 1.2em;">/ <span id="maxScoreDisplay">100</span></strong>
+                        <div id="scoreWarning" class="hidden" style="color: #dc3545; font-size: 0.9em; font-weight: bold; margin-top: 5px;"></div>
                     </div>
                     <div style="margin-top: 15px; background: #e9ecef; padding: 15px; border-radius: 5px;">
                         <strong>Cá nhân tự nhận xếp loại:</strong>
@@ -153,6 +154,7 @@
                             <option value="HTNV">Hoàn thành Nhiệm vụ</option>
                             <option value="KHTNV">Không hoàn thành Nhiệm vụ</option>
                         </select>
+                        <div id="classificationWarning" class="hidden" style="color: #d39e00; font-size: 0.9em; font-style: italic; margin-top: 8px; font-weight: bold;"></div>
                     </div>
                     <div style="text-align: right; margin-top: 15px;">
                         <button type="submit" class="btn-primary" style="padding: 12px 30px; font-size: 16px;">LƯU ĐIỂM CỦA TÔI</button>
@@ -231,7 +233,11 @@
         <div id="step4" class="tab-content">
             <div class="step-card">
                 <h3 style="color: #28a745; border-bottom: 1px dashed #28a745;">Bỏ phiếu Hoàn thành Xuất sắc nhiệm vụ</h3>
-                <p style="color: #666; font-style: italic; margin-bottom: 15px;">Danh sách chỉ gồm các cá nhân đạt "Hoàn thành Tốt nhiệm vụ" ở Bước 3. Số lượng Xuất sắc không vượt quá 20%.</p>
+                <p style="color: #666; font-style: italic; margin-bottom: 5px;">Danh sách chỉ gồm các cá nhân đạt "Hoàn thành Tốt nhiệm vụ" ở Bước 3.</p>
+                <ul style="color: #dc3545; font-size: 0.9em; font-weight: bold; margin-top: 0; margin-bottom: 15px; padding-left: 20px;">
+                    <li>Số lượng Xuất sắc KHÔNG ĐƯỢC VƯỢT QUÁ 20% tổng số cá nhân hoàn thành tốt nhiệm vụ.</li>
+                    <li>Cá nhân có điểm tự chấm dưới 90 điểm sẽ không đủ điều kiện Xếp loại Xuất sắc.</li>
+                </ul>
                 <div class="control-panel">
                     <div class="meta-controls">
                         <label><strong>Kỳ:</strong> <select id="step4Quarter"><option value="I">Quý I</option><option value="II">Quý II</option><option value="III">Quý III</option><option value="IV">Quý IV</option><option value="Cả năm">Cả năm</option></select></label>
