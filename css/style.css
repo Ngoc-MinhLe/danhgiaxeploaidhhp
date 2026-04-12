@@ -74,3 +74,15 @@ button:disabled { background-color: #ccc; cursor: not-allowed; }
 .action-btn { padding: 3px 8px; font-size: 12px; border-radius: 3px; cursor: pointer; color: white; border: none; margin: 0 2px; }
 .btn-edit { background-color: #17a2b8; }
 .btn-edit:hover { background-color: #138496; }
+
+/* --- Cấu hình cho chức năng In (Print) --- */
+@media print {
+    body { background: white; margin: 0; padding: 0; color: black; }
+    .top-bar, .top-banner, .workflow-tabs, #systemLockBanner, button, .meta-controls, #scoreWarning, #classificationWarning, .grading-note { display: none !important; }
+    .container { box-shadow: none; border: none; margin: 0; padding: 0; max-width: 100%; width: 100%; }
+    .step-card { box-shadow: none; border: none; padding: 0; margin: 0; background: white; }
+    .criteria-table th, .criteria-table td { border: 1px solid black !important; color: black !important; }
+    .criteria-table th { background-color: #f0f0f0 !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    input, select { border: none !important; background: transparent !important; color: black !important; font-weight: bold; appearance: none; -moz-appearance: none; -webkit-appearance: none; box-shadow: none; }
+    input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+}

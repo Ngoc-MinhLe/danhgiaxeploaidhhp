@@ -15,6 +15,10 @@
         <button id="logoutBtn" class="btn-secondary hidden">Đăng xuất</button>
     </div>
 
+    <div id="systemLockBanner" class="hidden" style="background: var(--danger-color); color: white; text-align: center; padding: 10px; font-weight: bold; font-size: 16px; letter-spacing: 1px; border-bottom: 2px solid #a71d2a;">
+        ⚠️ HỆ THỐNG ĐANG BỊ KHÓA ⚠️ - TẤT CẢ CÁC CHỨC NĂNG CẬP NHẬT DỮ LIỆU ĐÃ TẠM THỜI VÔ HIỆU HÓA.
+    </div>
+
     <div class="container">
         
         <div class="workflow-tabs">
@@ -115,6 +119,11 @@
                         </form>
                         <div id="step3VoterList" style="margin-top: 15px; border-top: 1px solid #ddd; padding-top: 10px;">Đang tải...</div>
                     </div>
+                    <div style="flex:1; min-width: 300px; background: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
+                        <strong style="color:#721c24;">4. Khóa/Mở Hệ thống (Đóng băng):</strong>
+                        <p style="font-size: 13px; color: #666; margin: 5px 0;">Ngăn chặn toàn bộ hành động tự chấm, bình bầu và bỏ phiếu trên toàn hệ thống.</p>
+                        <button type="button" id="toggleSystemLockBtn" class="btn-danger" style="margin: 10px 0 0 0; width: 100%; padding: 10px; font-weight:bold;">ĐANG TẢI TRẠNG THÁI...</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -122,6 +131,13 @@
         <div id="step1" class="tab-content active">
             <div class="step-card">
                 <h3>Cập nhật điểm tự đánh giá cá nhân</h3>
+                <div class="grading-note" style="background-color: #e9ecef; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 0.9em; border-left: 4px solid #17a2b8;">
+                    <strong>📌 Ghi chú thang điểm xếp loại:</strong>
+                    <span style="margin-left: 15px;">• <strong>Dưới 50đ:</strong> Không hoàn thành NV</span>
+                    <span style="margin-left: 15px;">• <strong>50đ - dưới 70đ:</strong> Hoàn thành NV</span>
+                    <span style="margin-left: 15px;">• <strong>70đ - dưới 90đ:</strong> Hoàn thành Tốt NV</span>
+                    <span style="margin-left: 15px;">• <strong>Từ 90đ trở lên:</strong> Đủ điều kiện xét HT Xuất sắc</span>
+                </div>
                 <div id="step1Content">Đang kiểm tra thông tin...</div>
                 <div class="control-panel" id="step1MetaControls" style="display: none; margin-bottom: 15px;">
                     <div class="meta-controls">
@@ -157,6 +173,7 @@
                         <div id="classificationWarning" class="hidden" style="color: #d39e00; font-size: 0.9em; font-style: italic; margin-top: 8px; font-weight: bold;"></div>
                     </div>
                     <div style="text-align: right; margin-top: 15px;">
+                        <button type="button" id="printSelfScoreBtn" class="btn-success" style="padding: 12px 20px; font-size: 16px; margin-right: 10px;">🖨️ In Phiếu Cá Nhân</button>
                         <button type="submit" class="btn-primary" style="padding: 12px 30px; font-size: 16px;">LƯU ĐIỂM CỦA TÔI</button>
                     </div>
                 </form>
@@ -166,6 +183,13 @@
         <div id="step2" class="tab-content">
             <div class="step-card">
                 <h3>Bình bầu tập thể & Đề xuất của Trưởng đơn vị</h3>
+                <div class="grading-note" style="background-color: #e9ecef; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 0.9em; border-left: 4px solid #17a2b8;">
+                    <strong>📌 Ghi chú thang điểm xếp loại:</strong>
+                    <span style="margin-left: 15px;">• <strong>Dưới 50đ:</strong> Không hoàn thành NV</span>
+                    <span style="margin-left: 15px;">• <strong>50đ - dưới 70đ:</strong> Hoàn thành NV</span>
+                    <span style="margin-left: 15px;">• <strong>70đ - dưới 90đ:</strong> Hoàn thành Tốt NV</span>
+                    <span style="margin-left: 15px;">• <strong>Từ 90đ trở lên:</strong> Đủ điều kiện xét HT Xuất sắc</span>
+                </div>
                 <div class="control-panel" id="step2Controls" style="display: none; margin-bottom: 15px;">
                     <div class="meta-controls">
                         <label><strong>Kỳ chốt xếp loại:</strong> 

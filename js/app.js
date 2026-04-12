@@ -49,6 +49,7 @@ let step4EligibleStaff = [];
 let step4MaxAllowed = 0;
 let currentStep4VoteId = null;
 let currentStep4VoteDetails = {};
+let isSystemLocked = false;
 
 // DOM Elements
 const loginBtn = document.getElementById('loginBtn');
@@ -155,6 +156,23 @@ onSnapshot(doc(db, "DaiHocHaiPhong_Config", "Step3Voters"), (docSnap) => {
     renderStep3VotersAdmin();
     loadUserVoteStateAndRender();
 });
+
+onSnapshot(doc(db, "DaiHocHaiPhong_Config", "SystemStatus"), (docSnap) => {
+    if (docSnap.exists()) isSystemLocked = docSnap.data().isLocked || false;
+    else isSystemLocked = false;
+    updateSystemLockUI();
+    renderAllViews();
+});
+
+function updateSystemLockUI() {
+    const banner = document.getElementById('systemLockBanner');
+    if (banner) { if (isSystemLocked) banner.classList.remove('hidden'); else banner.classList.add('hidden'); }
+    const btn = document.getElementById('toggleSystemLockBtn');
+    if (btn) {
+        if (isSystemLocked) { btn.innerText = "MỞ KHÓA HỆ THỐNG"; btn.className = "btn-success"; } 
+        else { btn.innerText = "KHÓA HỆ THỐNG"; btn.className = "btn-danger"; }
+    }
+}
 
 function renderCriteriaAdmin() {
     // Dropdown chọn Nhóm Lớn
@@ -448,6 +466,14 @@ window.removeStep3Voter = async function(email) {
     if(!confirm(`Xóa quyền của ${email}?`)) return; try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "Step3Voters"), { emails: step3Voters.filter(e => e !== email) }); } catch(e) { handleFirebaseError(e); } 
 };
 
+document.getElementById('toggleSystemLockBtn')?.addEventListener('click', async () => {
+    if (userRole !== 'superadmin' && userRole !== 'admin') return showMessage("Bạn không có quyền!", true);
+    const newState = !isSystemLocked;
+    const msg = newState ? "Bạn có chắc chắn muốn KHÓA hệ thống?\n\nMọi người sẽ KHÔNG THỂ thêm hay sửa dữ liệu đánh giá nữa." : "Bạn muốn MỞ KHÓA hệ thống?";
+    if (!confirm(msg)) return;
+    try { await setDoc(doc(db, "DaiHocHaiPhong_Config", "SystemStatus"), { isLocked: newState }, { merge: true }); showMessage(newState ? "Đã khóa hệ thống!" : "Đã mở khóa hệ thống!"); } catch(e) { handleFirebaseError(e); }
+});
+
 document.getElementById('addAdminForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const newEmail = document.getElementById('newAdminEmail').value.trim();
@@ -576,6 +602,14 @@ function renderStep1() {
 
     document.querySelectorAll('.crit-input').forEach(input => { input.addEventListener('input', calculateTotalScore); });
     calculateTotalScore();
+
+    if (isSystemLocked) {
+        document.getElementById('selfScoreForm').querySelectorAll('input, select, button').forEach(el => el.disabled = true);
+        document.querySelector('#selfScoreForm button[type="submit"]').innerText = "HỆ THỐNG ĐÃ KHÓA";
+    } else {
+        const btn = document.querySelector('#selfScoreForm button[type="submit"]');
+        if(btn) btn.innerText = "LƯU ĐIỂM CỦA TÔI";
+    }
 }
 
 function calculateTotalScore() {
@@ -625,6 +659,8 @@ function calculateTotalScore() {
 
 document.getElementById('selfScoreForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (isSystemLocked) return alert("Hệ thống đang bị khóa!");
+
     const activeMax = parseFloat(document.getElementById('maxScoreDisplay').innerText) || 0;
     if (activeMax > 100) {
         alert("Vui lòng bỏ tích bớt Nhóm đối tượng để Điểm tối đa không vượt quá 100đ trước khi lưu!");
@@ -666,6 +702,10 @@ document.getElementById('selfScoreForm').addEventListener('submit', async (e) =>
     
     try { await updateDoc(doc(db, "DaiHocHaiPhong_NhanSu", deptId), { members: updatedMembers }); showMessage("Đã lưu bảng điểm tự đánh giá!"); } 
     catch(e) { handleFirebaseError(e); }
+});
+
+document.getElementById('printSelfScoreBtn')?.addEventListener('click', () => {
+    window.print();
 });
 
 // --- BƯỚC 2: TRƯỞNG ĐƠN VỊ ĐỀ XUẤT ---
@@ -741,9 +781,19 @@ function renderStep2() {
         });
     });
     proposalTableBody.innerHTML = html;
+
+    if (isSystemLocked) {
+        document.getElementById('deptProposalForm').querySelectorAll('select, button').forEach(el => el.disabled = true);
+        document.querySelector('#deptProposalForm button[type="submit"]').innerText = "HỆ THỐNG ĐÃ KHÓA";
+    } else {
+        const btn = document.querySelector('#deptProposalForm button[type="submit"]');
+        if(btn) btn.innerText = "Lưu Đề Xuất Đơn Vị";
+    }
 }
 deptProposalForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (isSystemLocked) return alert("Hệ thống đang bị khóa!");
+
     const userEmail = auth.currentUser.email; 
     const involvedDepts = currentStaffData.filter(d => d.headEmail === userEmail || (d.members && d.members.some(m => m.email === userEmail)));
     const formData = new FormData(deptProposalForm);
@@ -848,12 +898,18 @@ function renderVotingTable() {
     });
     html += `</tbody></table>`;
     tableContainer.innerHTML = html;
-    if(canVote) {
-        document.getElementById('submitBtn').disabled = false;
-        document.getElementById('submitBtn').innerText = currentUserVoteId ? "Cập nhật phiếu đánh giá" : "Gửi phiếu đánh giá cấp Đảng ủy";
-    } else {
+    if (isSystemLocked) {
         document.getElementById('submitBtn').disabled = true;
-        document.getElementById('submitBtn').innerText = "Tài khoản của bạn không có quyền bỏ phiếu";
+        document.getElementById('submitBtn').innerText = "HỆ THỐNG ĐÃ KHÓA";
+        document.querySelectorAll('input[type="radio"]').forEach(el => el.disabled = true);
+    } else {
+        if(canVote) {
+            document.getElementById('submitBtn').disabled = false;
+            document.getElementById('submitBtn').innerText = currentUserVoteId ? "Cập nhật phiếu đánh giá" : "Gửi phiếu đánh giá cấp Đảng ủy";
+        } else {
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').innerText = "Tài khoản của bạn không có quyền bỏ phiếu";
+        }
     }
 }
 voteTypeSelect.addEventListener('change', loadUserVoteStateAndRender);
@@ -862,6 +918,7 @@ document.getElementById('voteYear').addEventListener('change', loadUserVoteState
 
 document.getElementById('votingForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (isSystemLocked) return alert("Hệ thống đang bị khóa!");
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = true; submitBtn.innerText = "Đang gửi...";
     
@@ -972,7 +1029,13 @@ function renderStep4Table() {
         </tr>`;
     });
     html += `</tbody></table>`; tableContainer.innerHTML = html;
+
+if (isSystemLocked) {
+    submitBtn.disabled = true; submitBtn.innerText = "HỆ THỐNG ĐÃ KHÓA";
+    document.querySelectorAll('.step4-checkbox').forEach(cb => cb.disabled = true);
+} else {
     submitBtn.disabled = false; submitBtn.innerText = currentStep4VoteId ? "Cập nhật phiếu bầu Xuất sắc" : "Gửi phiếu bầu Xuất sắc";
+}
 
     // JS logic giới hạn số lượng checkbox
     document.querySelectorAll('.step4-checkbox').forEach(cb => {
@@ -986,6 +1049,7 @@ function renderStep4Table() {
 
 document.getElementById('step4VotingForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (isSystemLocked) return alert("Hệ thống đang bị khóa!");
     const submitBtn = document.getElementById('submitStep4Btn'); submitBtn.disabled = true; submitBtn.innerText = "Đang gửi...";
     const q = document.getElementById('step4Quarter').value; const y = document.getElementById('step4Year').value;
     const voterEmail = auth.currentUser ? (auth.currentUser.email || auth.currentUser.displayName) : "Khách ẩn danh";
